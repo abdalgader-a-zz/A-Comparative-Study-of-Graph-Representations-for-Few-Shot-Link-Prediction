@@ -1,2 +1,12 @@
-# MetaLearning-for-graph-representation-with-application-to-drug-discovery
-Meta-Learning for graph representation with application to drug discovery, by adding Proto-Maml to Meta-Graph.
+# Meta-Learning for Graph Representation with Application to Drug Discovery
+
+ "write the description here "
+
+# Enviroment
+
+The requierd packages for the enviroment can be founded here [requirements.txt](Meta-Graph/requirements.txt), then you should use the following command 
+
+```
+pip install torch-scatter==latest+cpu torch-sparse==latest+cpu torch-cluster==latest+cpu torch_spline_conv==latest+cpu -f https://pytorch-geometric.com/whl/torch-1.4.0.html 
+```
+
