@@ -54,7 +54,6 @@ parso==0.7.0
 pathtools==0.1.2
 pexpect==4.8.0
 pickleshare==0.7.5
-Pillow @ file:///tmp/build/80754af9/pillow_1594307295532/work
 plyfile==0.7.2
 promise==2.3
 prompt-toolkit==3.0.5
