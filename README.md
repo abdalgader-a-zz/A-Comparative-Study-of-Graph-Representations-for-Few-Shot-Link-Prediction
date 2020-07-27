@@ -4,7 +4,7 @@
 
 # Enviroment
 
-The requierd packages for the enviroment can be founded here [requirements.txt](Meta-Graph/requirements.txt). The main packages should be as follows
+The requierd packages for the enviroment can be founded here [requirements.txt](Meta-Graph/requirements.txt). The main packages are:
 * torch==1.4.0
 * torch-scatter==latest
 * torch-sparse==latest
@@ -13,7 +13,7 @@ The requierd packages for the enviroment can be founded here [requirements.txt](
 * torch-geometric==1.5.0
 
 
-In CPU case the installation command is as follows,
+In CPU case the installation command is,
 
 ```
 pip install torch-scatter==latest+cpu torch-sparse==latest+cpu torch-cluster==latest+cpu torch_spline_conv==latest+cpu -f https://pytorch-geometric.com/whl/torch-1.4.0.html 
