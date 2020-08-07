@@ -39,3 +39,5 @@ This command will run the Meta-Graph algorithm using 10% training edges for each
 It will also use the default GraphSignature function as the encoder in a VGAE. The `--use_gcn_sig`
 flag will force the GraphSignature to use a GCN style signature function  and finally
 order 2 will perform second order optimization.
+
+test
