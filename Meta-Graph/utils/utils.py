@@ -112,10 +112,10 @@ def uniform(size, tensor):
     if tensor is not None:
         tensor.data.uniform_(-bound, bound)
 
-def test(model, x, train_pos_edge_index, pos_edge_index, neg_edge_index,weights):
+def test(model, x, train_pos_edge_index, only_gae, pos_edge_index, neg_edge_index,weights):
     model.eval()
     with torch.no_grad():
-        z = model.encode(x, train_pos_edge_index,weights)
+        z = model.encode(x, train_pos_edge_index, weights, only_gae)
     return model.test(z, pos_edge_index, neg_edge_index)
 
 def global_test(args, model, data_batch, weights):

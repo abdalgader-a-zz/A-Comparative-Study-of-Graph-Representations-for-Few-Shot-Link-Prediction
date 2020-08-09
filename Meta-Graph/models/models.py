@@ -126,7 +126,7 @@ class MetaSignatureEncoder(torch.nn.Module):
         # in_channels is the input feature dim
         self.signature = GraphSignature(args, in_channels, out_channels)
 
-    def forward(self, x, edge_index, weights, inner_loop=True):
+    def forward(self, x, edge_index, weights, only_gae=False,  inner_loop=True):
         keys = list(weights.keys())
         sig_keys = [key for key in keys if 'signature' in key]
         if inner_loop:

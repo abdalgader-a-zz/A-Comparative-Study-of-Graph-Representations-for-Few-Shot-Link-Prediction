@@ -243,7 +243,6 @@ class MyVGAE(MyGAE):
         self.__mu__, self.__logvar__ = self.encoder(*args, **kwargs)
         self.__logvar__ = torch.clamp(self.__logvar__,min=LOG_VAR_MIN,max=LOG_VAR_MAX)
         # self.__logvar__ = torch.clamp(self.__logvar__,max=LOG_VAR_MAX)
-
         if not kwargs['only_gae']:
              z = self.reparametrize(self.__mu__, self.__logvar__)
         else:

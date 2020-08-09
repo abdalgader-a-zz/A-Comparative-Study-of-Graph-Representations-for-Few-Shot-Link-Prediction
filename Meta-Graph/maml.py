@@ -184,7 +184,7 @@ def meta_gradient_step(model,
             loss_val.backward(retain_graph=True)
 
         # Get post-update accuracies
-        auc, ap = test(model, x, train_pos_edge_index,
+        auc, ap = test(model, x, train_pos_edge_index, args.apply_gae_only,
                 data.test_pos_edge_index, data.test_neg_edge_index,fast_weights)
 
         auc_list.append(auc)
