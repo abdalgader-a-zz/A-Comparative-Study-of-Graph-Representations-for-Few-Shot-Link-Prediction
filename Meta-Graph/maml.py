@@ -111,11 +111,12 @@ def meta_gradient_step(model,
         # Train the model for `inner_train_steps` iterations
         for inner_batch in range(inner_train_steps):
             # Perform update of model weights
-            z = model.encode(x, train_pos_edge_index, fast_weights, inner_loop=True)
+            z = model.encode(x, train_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=True)
             loss = model.recon_loss(z, train_pos_edge_index)
             if args.model in ['VGAE']:
-                kl_loss = args.kl_anneal*(1 / num_nodes) * model.kl_loss()
-                loss = loss + kl_loss
+                if not args.apply_gae_only:
+                    kl_loss = args.kl_anneal*(1 / num_nodes) * model.kl_loss()
+                    loss = loss + kl_loss
                 # print("Inner KL Loss: %f" %(kl_loss.item()))
             if not args.train_only_gs:
                 gradients = torch.autograd.grad(loss, fast_weights.values(),\
@@ -165,12 +166,13 @@ def meta_gradient_step(model,
 
         # Do a pass of the model on the validation data from the current task
         val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
-        z_val = model.encode(x, val_pos_edge_index, fast_weights, inner_loop=False)
+        z_val = model.encode(x, val_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=False)
         loss_val = model.recon_loss(z_val, val_pos_edge_index)
         if args.model in ['VGAE']:
-            kl_loss = args.kl_anneal*(1 / num_nodes) * model.kl_loss()
-            # print("Outer KL Loss: %f" %(kl_loss.item()))
-            loss_val = loss_val + kl_loss
+            if not args.apply_gae_only:
+                kl_loss = args.kl_anneal*(1 / num_nodes) * model.kl_loss()
+                # print("Outer KL Loss: %f" %(kl_loss.item()))
+                loss_val = loss_val + kl_loss
 
         if args.wandb:
             wandb.log({"Inner_Val_loss":loss_val.item()})

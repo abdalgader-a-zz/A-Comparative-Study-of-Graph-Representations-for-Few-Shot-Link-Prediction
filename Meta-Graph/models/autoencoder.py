@@ -233,9 +233,9 @@ class MyVGAE(MyGAE):
         super(MyVGAE, self).__init__(encoder, decoder=decoder)
 
     def reparametrize(self, mu, logvar):
-        # if self.training:
-        #     return mu + torch.randn_like(logvar) * torch.exp(logvar)
-        # else:
+        if self.training:
+            return mu + torch.randn_like(logvar) * torch.exp(logvar)
+        else:
             return mu
 
     def encode(self, *args, **kwargs):
@@ -243,7 +243,11 @@ class MyVGAE(MyGAE):
         self.__mu__, self.__logvar__ = self.encoder(*args, **kwargs)
         self.__logvar__ = torch.clamp(self.__logvar__,min=LOG_VAR_MIN,max=LOG_VAR_MAX)
         # self.__logvar__ = torch.clamp(self.__logvar__,max=LOG_VAR_MAX)
-        z = self.reparametrize(self.__mu__, self.__logvar__)
+
+        if not kwargs['only_gae']:
+             z = self.reparametrize(self.__mu__, self.__logvar__)
+        else:
+             z = self.__mu__
         return z
 
     def kl_loss(self, mu=None, logvar=None):
@@ -261,5 +265,5 @@ class MyVGAE(MyGAE):
         mu = self.__mu__ if mu is None else mu
         logvar = self.__logvar__ if logvar is None else logvar
         # print("KL Variance is %f" %(torch.mean(logvar.exp()).item()))
-        return 0      #-0.5 * torch.mean(torch.sum(1 + logvar - mu**2 - logvar.exp(), dim=1))
+        return -0.5 * torch.mean(torch.sum(1 + logvar - mu**2 - logvar.exp(), dim=1))
 
