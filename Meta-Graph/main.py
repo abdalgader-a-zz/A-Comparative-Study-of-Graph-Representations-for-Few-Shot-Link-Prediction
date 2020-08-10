@@ -529,7 +529,7 @@ if __name__ == '__main__':
     parser.add_argument('--gating', type=str, default=None, choices=[None, 'signature', 'weights', 'signature_cond', 'weights_cond'])
     parser.add_argument('--layer_norm', default=False, action='store_true',
                         help='use layer norm')
-    parser.add_argument('--apply_gae_only', default=False, action='store_true', help='apply simple GAE in the training process')
+    parser.add_argument('--apply_gae_only',  default= False, action='store_true', help='apply simple GAE')
 
     args = parser.parse_args()
 
