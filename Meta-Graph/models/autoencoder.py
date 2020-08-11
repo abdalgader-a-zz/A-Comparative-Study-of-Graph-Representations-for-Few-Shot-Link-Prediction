@@ -232,6 +232,7 @@ class MyVGAE(MyGAE):
     def __init__(self, encoder, decoder=None):
         super(MyVGAE, self).__init__(encoder, decoder=decoder)
 
+
     def reparametrize(self, mu, logvar):
         if self.training:
             return mu + torch.randn_like(logvar) * torch.exp(logvar)
