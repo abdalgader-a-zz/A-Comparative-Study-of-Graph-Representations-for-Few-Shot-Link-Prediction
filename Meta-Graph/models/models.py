@@ -1,3 +1,7 @@
+import os, sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+
 import torch
 import math
 import torch.nn.functional as F
@@ -13,6 +17,7 @@ from torch import nn
 from .layers import MetaGCNConv, MetaGatedGraphConv, MetaGRUCell, MetaGatedGCNConv
 import torch.nn.functional as F
 from utils.utils import uniform
+from utils.edge_drop import EdgeDrop, DropMode
 import ipdb
 
 def glorot(tensor):
@@ -125,8 +130,16 @@ class MetaSignatureEncoder(torch.nn.Module):
                 2 * out_channels, out_channels, cached=False)
         # in_channels is the input feature dim
         self.signature = GraphSignature(args, in_channels, out_channels)
+        if self.args.drop_edges:
+            if self.args.drop_mode == 'equal':
+                self.edge_drop = EdgeDrop(keep_prob=args.keep_prob, mode=DropMode.EQUAL, plot=False)
+            else:
+                self.edge_drop = EdgeDrop(keep_prob=args.keep_prob, mode=DropMode.WEIGHTED, plot=False)
+
 
     def forward(self, x, edge_index, weights, only_gae=False,  inner_loop=True):
+        if self.args.drop_edges:
+            edge_index = self.edge_drop(edge_index)
         keys = list(weights.keys())
         sig_keys = [key for key in keys if 'signature' in key]
         if inner_loop:

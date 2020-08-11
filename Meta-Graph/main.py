@@ -531,7 +531,8 @@ if __name__ == '__main__':
                         help='use layer norm')
     parser.add_argument('--apply_gae_only',  default= False, action='store_true', help='apply simple GAE')
     parser.add_argument('--drop_edges', default=False, action='store_true', help='drop edges')
-    parser.add_argument('--keep_prob', type=float, help='edges keep probability')
+    parser.add_argument('--keep_prob', type=float, default= .9, help='edges keep probability')
+    parser.add_argument('--drop_mode', type=str, default='equal', choices=['equal', 'weighted'], help='edges drop mode')
 
     args = parser.parse_args()
 
