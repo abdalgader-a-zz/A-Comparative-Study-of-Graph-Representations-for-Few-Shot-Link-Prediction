@@ -38,14 +38,17 @@ class EdgeDrop(nn.Module):
 
     def forward(self, x):
         if self.mode == DropMode.EQUAL:
+            if self.plot:
+                self.get_connection_detail(x)
             alpha = torch.ones_like(x[0]) * self.keep_prob
             edge_index = torch.bernoulli(alpha)
             indices = torch.where(edge_index == 1)[0]
             x = x[:, indices]
-            print(x.shape)
+            if self.plot:
+                self.get_connection_detail(x)
             return x
         elif self.mode == DropMode.WEIGHTED:
-            counts, drop_rate, unique, upper_line, upper_quartile = self.get_connection_detail(x)
+            counts, drop_rate, unique, upper_line, upper_quartile, lower_line, lower_quartile = self.get_connection_detail(x)
 
             upper_indices = np.where(counts >= upper_line)[0]
             lower_indices = np.where(counts < upper_line)[0]
@@ -53,11 +56,13 @@ class EdgeDrop(nn.Module):
             upper_nodes = unique[upper_indices]
             lower_nodes = unique[lower_indices]
 
-            rate_adj = [(upper_mean / upper_quartile) * drop_rate] * len(upper_nodes)
-            drop_rate = [1. - self.keep_prob] * len(lower_nodes)
+            upper_rate_adj = [(upper_mean / upper_quartile) * drop_rate] * len(upper_nodes)
+            # drop_rate = [1. - self.keep_prob] * len(lower_nodes)
+            lower_rate_adj = [(1. - (lower_quartile / upper_quartile)) * drop_rate] * len(lower_nodes)
 
-            upper_dict = dict(zip(upper_nodes, rate_adj))
-            lower_dict = dict(zip(lower_nodes, drop_rate))
+
+            upper_dict = dict(zip(upper_nodes, upper_rate_adj))
+            lower_dict = dict(zip(lower_nodes, lower_rate_adj))
             upper_dict.update(lower_dict)
             dictionary = upper_dict
             nodes = x.detach().cpu().numpy()
@@ -71,18 +76,29 @@ class EdgeDrop(nn.Module):
             return x
 
     def get_connection_detail(self, x):
-        (unique, counts) = np.unique(x[0], return_counts=True)
+        (unique, counts) = np.unique(x.data.cpu().numpy()[0], return_counts=True)
         drop_rate = 1. - self.keep_prob
         Q3 = np.percentile(counts, 75, axis=0)
         Q1 = np.percentile(counts, 25, axis=0)
         IQR = Q3 - Q1
         upper_quartile = Q3 + 1.5 * IQR
         upper_line = [upper_quartile] * len(counts)
+
+        lower_indices = np.where(counts < upper_line)[0]
+        lower_quartile = np.mean(counts[lower_indices], axis=0)
+        lower_line = [lower_quartile] * len(counts)
+
         if self.plot:
             plt.plot(counts, c='blue')
-            plt.plot(upper_line, c='red')
+            plt.plot(upper_line, c='red', label=f'upper={upper_line[0]:.2f}')
+            plt.plot(lower_line, c='yellow', label=f'lower={lower_line[0]:.2f}')
+            plt.ylabel('number of connections')
+            plt.xlabel('node index')
+            plt.legend(loc='upper left')
             plt.show()
-        return counts, drop_rate, unique, upper_line, upper_quartile
+            print(f"upper threshold: {upper_line[0]}")
+            print(f"lower threshold: {lower_line[0]}")
+        return counts, drop_rate, unique, upper_line, upper_quartile, lower_line, lower_quartile
 
 
 if __name__ == '__main__':
@@ -90,7 +106,15 @@ if __name__ == '__main__':
     with open('data.npy', 'rb') as f:
         x = np.load(f)
         x = torch.tensor(x)
-        plot_graph(x, name='before_graph_weighted.png')
+        print(x.shape)
+        # plot_graph(x, name='before_graph_weighted.png')
         x = edge_drop(x)
-        plot_graph(x, name='after_graph_weighted.png')
+        print(x.shape)
+        # plot_graph(x, name='after_graph_weighted.png')
 
+# torch.Size([2, 12930])
+# upper threshold: 24.5
+# lower threshold: 6.262433052792655
+# upper threshold: 19.5
+# lower threshold: 5.596786534047437
+# torch.Size([2, 8868])

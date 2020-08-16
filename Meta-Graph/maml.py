@@ -111,7 +111,7 @@ def meta_gradient_step(model,
         # Train the model for `inner_train_steps` iterations
         for inner_batch in range(inner_train_steps):
             # Perform update of model weights
-            z = model.encode(x, train_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=True)
+            z = model.encode(x, train_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=True, train=train)
             loss = model.recon_loss(z, train_pos_edge_index)
             if args.model in ['VGAE']:
                 if not args.apply_gae_only:
@@ -166,7 +166,7 @@ def meta_gradient_step(model,
 
         # Do a pass of the model on the validation data from the current task
         val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
-        z_val = model.encode(x, val_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=False)
+        z_val = model.encode(x, val_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=False, train=train)
         loss_val = model.recon_loss(z_val, val_pos_edge_index)
         if args.model in ['VGAE']:
             if not args.apply_gae_only:
@@ -238,7 +238,7 @@ def meta_gradient_step(model,
             # Replace dummy gradients with mean task gradients using hooks
             ## TODO: Double check if you really need functional forward here
             z_dummy = model.encode(torch.zeros(x.shape[0],x.shape[1]).float().cuda(), \
-                    torch.zeros(train_pos_edge_index.shape[0],train_pos_edge_index.shape[1]).long().cuda(), fast_weights)
+                    torch.zeros(train_pos_edge_index.shape[0],train_pos_edge_index.shape[1]).long().cuda(), fast_weights, train=train)
             loss = model.recon_loss(z_dummy,torch.zeros(train_pos_edge_index.shape[0],\
                     train_pos_edge_index.shape[1]).long().cuda())
             loss.backward()
