@@ -573,3 +573,4 @@ if __name__ == '__main__':
 
     print(vars(args))
     eval_metric = main(args)
+ # This check for new dgcnn branch
