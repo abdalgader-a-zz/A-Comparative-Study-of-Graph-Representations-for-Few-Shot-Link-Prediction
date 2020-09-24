@@ -1,5 +1,7 @@
 import torch
-import os
+import os, sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 import os.path as osp
 import argparse
 import ipdb
@@ -112,10 +114,10 @@ def uniform(size, tensor):
     if tensor is not None:
         tensor.data.uniform_(-bound, bound)
 
-def test(model, x, train_pos_edge_index, pos_edge_index, neg_edge_index,weights):
+def test(model, x, train_pos_edge_index, only_gae, pos_edge_index, neg_edge_index,weights):
     model.eval()
     with torch.no_grad():
-        z = model.encode(x, train_pos_edge_index,weights)
+        z = model.encode(x, train_pos_edge_index, weights, only_gae=only_gae)
     return model.test(z, pos_edge_index, neg_edge_index)
 
 def global_test(args, model, data_batch, weights):
@@ -154,7 +156,7 @@ def global_test(args, model, data_batch, weights):
             continue
 
         with torch.no_grad():
-            z = model.encode(x, train_pos_edge_index,weights)
+            z = model.encode(x, train_pos_edge_index,weights, only_gae=args.apply_gae_only)
         auc, ap = model.test(z, pos_edge_index, neg_edge_index)
         auc_list.append(auc)
         ap_list.append(ap)
@@ -417,10 +419,10 @@ def subsample_edges(G, num_edges):
     G.edge_index = subsampled_edges
     return G
 
-def val(model, args, x, val_pos_edge_index, num_nodes, weights):
+def val(model, args, x, only_gae, val_pos_edge_index, num_nodes, weights):
     model.eval()
     with torch.no_grad():
-        z = model.encode(x, val_pos_edge_index, weights)
+        z = model.encode(x, val_pos_edge_index, weights, only_gae=only_gae)
         loss = model.recon_loss(z, val_pos_edge_index)
         if args.model in ['VGAE']:
             loss = loss + (1 / num_nodes) * model.kl_loss()

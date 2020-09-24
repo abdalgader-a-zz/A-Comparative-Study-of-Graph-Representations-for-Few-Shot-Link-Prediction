@@ -3,6 +3,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+<<<<<<< HEAD
 Meta-Graph/utils/data.npy
 saved_models/
 weighted_kp_out/
@@ -15,6 +16,9 @@ Meta-Graph/jobs_out/
 Meta-Graph/out
 Meta-Graph/runner.sh
 test.py
+=======
+
+>>>>>>> 7356dfdad104d230fe44c174c77a6c4fca8ee074
 # C extensions
 *.so
 

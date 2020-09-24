@@ -111,11 +111,12 @@ def meta_gradient_step(model,
         # Train the model for `inner_train_steps` iterations
         for inner_batch in range(inner_train_steps):
             # Perform update of model weights
-            z = model.encode(x, train_pos_edge_index, fast_weights, inner_loop=True)
+            z = model.encode(x, train_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=True, train=train)
             loss = model.recon_loss(z, train_pos_edge_index)
             if args.model in ['VGAE']:
-                kl_loss = args.kl_anneal*(1 / num_nodes) * model.kl_loss()
-                loss = loss + kl_loss
+                if not args.apply_gae_only:
+                    kl_loss = args.kl_anneal*(1 / num_nodes) * model.kl_loss()
+                    loss = loss + kl_loss
                 # print("Inner KL Loss: %f" %(kl_loss.item()))
             if not args.train_only_gs:
                 gradients = torch.autograd.grad(loss, fast_weights.values(),\
@@ -134,10 +135,10 @@ def meta_gradient_step(model,
 
             ''' Only do this if its the final test set eval '''
             if args.final_test and inner_batch % 5 ==0:
-                inner_test_auc, inner_test_ap = test(model, x, train_pos_edge_index,
+                inner_test_auc, inner_test_ap = test(model, x, train_pos_edge_index, args.apply_gae_only,
                         data.test_pos_edge_index, data.test_neg_edge_index,fast_weights)
                 val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
-                val_loss = val(model,args, x,val_pos_edge_index,data.num_nodes,fast_weights)
+                val_loss = val(model,args, x, args.apply_gae_only,val_pos_edge_index,data.num_nodes,fast_weights)
                 early_stopping(val_loss, model)
                 my_step = int(inner_batch / 5)
                 inner_test_auc_array[graph_id][my_step] = inner_test_auc
@@ -165,12 +166,13 @@ def meta_gradient_step(model,
 
         # Do a pass of the model on the validation data from the current task
         val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
-        z_val = model.encode(x, val_pos_edge_index, fast_weights, inner_loop=False)
+        z_val = model.encode(x, val_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=False, train=train)
         loss_val = model.recon_loss(z_val, val_pos_edge_index)
         if args.model in ['VGAE']:
-            kl_loss = args.kl_anneal*(1 / num_nodes) * model.kl_loss()
-            # print("Outer KL Loss: %f" %(kl_loss.item()))
-            loss_val = loss_val + kl_loss
+            if not args.apply_gae_only:
+                kl_loss = args.kl_anneal*(1 / num_nodes) * model.kl_loss()
+                # print("Outer KL Loss: %f" %(kl_loss.item()))
+                loss_val = loss_val + kl_loss
 
         if args.wandb:
             wandb.log({"Inner_Val_loss":loss_val.item()})
@@ -182,7 +184,7 @@ def meta_gradient_step(model,
             loss_val.backward(retain_graph=True)
 
         # Get post-update accuracies
-        auc, ap = test(model, x, train_pos_edge_index,
+        auc, ap = test(model, x, train_pos_edge_index, args.apply_gae_only,
                 data.test_pos_edge_index, data.test_neg_edge_index,fast_weights)
 
         auc_list.append(auc)
@@ -236,7 +238,7 @@ def meta_gradient_step(model,
             # Replace dummy gradients with mean task gradients using hooks
             ## TODO: Double check if you really need functional forward here
             z_dummy = model.encode(torch.zeros(x.shape[0],x.shape[1]).float().cuda(), \
-                    torch.zeros(train_pos_edge_index.shape[0],train_pos_edge_index.shape[1]).long().cuda(), fast_weights)
+                    torch.zeros(train_pos_edge_index.shape[0],train_pos_edge_index.shape[1]).long().cuda(), fast_weights, train=train)
             loss = model.recon_loss(z_dummy,torch.zeros(train_pos_edge_index.shape[0],\
                     train_pos_edge_index.shape[1]).long().cuda())
             loss.backward()
