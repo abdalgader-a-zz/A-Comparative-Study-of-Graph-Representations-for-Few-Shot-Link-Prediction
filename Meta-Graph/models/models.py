@@ -77,7 +77,7 @@ class DGCNN(torch.nn.Module):
         self.bn3 = nn.BatchNorm2d(128)
         self.bn4 = nn.BatchNorm2d(256)
         self.bn5 = nn.BatchNorm1d(256)
-        self.bn6 = nn.BatchNorm1d(512)
+        self.bn6 = nn.BatchNorm1d(args.emb_dims)
         self.bn7 = nn.BatchNorm1d(1024)
 
         self.conv1 = nn.Sequential(nn.Conv2d(120, 64, kernel_size=1, bias=False),

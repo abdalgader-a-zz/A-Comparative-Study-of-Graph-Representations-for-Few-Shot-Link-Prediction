@@ -117,7 +117,11 @@ def uniform(size, tensor):
 def test(model, x, train_pos_edge_index, only_gae, pos_edge_index, neg_edge_index,weights):
     model.eval()
     with torch.no_grad():
-        z = model.encode(x, train_pos_edge_index, weights, only_gae=only_gae)
+        if model.encoder.args.encoder == 'DGCNN':
+            z = model.encode(x)
+            z = z.squeeze(0)
+        else:
+            z = model.encode(x, train_pos_edge_index, weights, only_gae=only_gae)
     return model.test(z, pos_edge_index, neg_edge_index)
 
 def global_test(args, model, data_batch, weights):
@@ -156,7 +160,12 @@ def global_test(args, model, data_batch, weights):
             continue
 
         with torch.no_grad():
-            z = model.encode(x, train_pos_edge_index,weights, only_gae=args.apply_gae_only)
+            if args.encoder == 'DGCNN':
+                x = x.unsqueeze(0).permute(0, 2, 1)
+                z = model.encode(x)
+                z = z.squeeze(0)
+            else:
+                z = model.encode(x, train_pos_edge_index,weights, only_gae=args.apply_gae_only)
         auc, ap = model.test(z, pos_edge_index, neg_edge_index)
         auc_list.append(auc)
         ap_list.append(ap)

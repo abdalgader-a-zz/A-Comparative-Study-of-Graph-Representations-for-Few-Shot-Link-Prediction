@@ -324,7 +324,7 @@ def main(args):
     if not args.do_kl_anneal:
         args.kl_anneal = 1
 
-    if args.encoder == 'GraphSignature' or args.encoder == 'GatedGraphSignature':
+    if args.encoder == 'GraphSignature' or args.encoder == 'GatedGraphSignature' or args.encoder == 'DGCNN':
         args.allow_unused = True
     else:
         args.allow_unused = False
@@ -461,14 +461,14 @@ if __name__ == '__main__':
     parser.add_argument('--meta_val_edge_ratio', type=float, default='0.2')
     parser.add_argument('--k_core', type=int, default=5, help="K-core for Graph")
     parser.add_argument('--clip', type=float, default='1', help='Gradient Clip')
-    parser.add_argument('--clip_weight_val', type=float, default='0.1',\
-            help='Weight Clip')
+    parser.add_argument('--clip_weight_val', type=float, default='0.1', \
+                        help='Weight Clip')
     parser.add_argument('--train_ratio', type=float, default='0.8', \
-            help='Used to split number of graphs for training if not provided')
-    parser.add_argument('--val_ratio', type=float, default='0.1',\
-            help='Used to split number of graphs for va1idation if not provided')
-    parser.add_argument('--num_gated_layers', default=4, type=int,\
-            help='Number of layers to use for the Gated Graph Conv Layer')
+                        help='Used to split number of graphs for training if not provided')
+    parser.add_argument('--val_ratio', type=float, default='0.1', \
+                        help='Used to split number of graphs for va1idation if not provided')
+    parser.add_argument('--num_gated_layers', default=4, type=int, \
+                        help='Number of layers to use for the Gated Graph Conv Layer')
     parser.add_argument('--mlp_lr', default=1e-3, type=float)
     parser.add_argument('--inner-lr', default=0.01, type=float)
     parser.add_argument('--reset_inner_factor', default=20, type=float)
@@ -477,53 +477,53 @@ if __name__ == '__main__':
     parser.add_argument('--inner_steps', type=int, default=50)
     parser.add_argument("--finetune", action="store_true", default=False)
     parser.add_argument("--concat_fixed_feats", action="store_true", default=False,
-		help='Concatenate random node features to current node features')
+                        help='Concatenate random node features to current node features')
     parser.add_argument("--extra_backward", action="store_true", default=False,
-		help='Do Extra Backward pass like in Original Pytorch MAML repo')
+                        help='Do Extra Backward pass like in Original Pytorch MAML repo')
     parser.add_argument("--use_fixed_feats", action="store_true", default=False,
-		help='Use a random node features')
+                        help='Use a random node features')
     parser.add_argument("--use_same_fixed_feats", action="store_true", default=False,
-		help='Use a random node features for all nodes')
+                        help='Use a random node features for all nodes')
     parser.add_argument('--min_nodes', type=int, default=1000, \
-            help='Min Nodes needed for a graph to be included')
+                        help='Min Nodes needed for a graph to be included')
     parser.add_argument('--max_nodes', type=int, default=50000, \
-            help='Max Nodes needed for a graph to be included')
+                        help='Max Nodes needed for a graph to be included')
     parser.add_argument('--kl_anneal', type=int, default=0, \
-            help='KL Anneal Coefficient')
+                        help='KL Anneal Coefficient')
     parser.add_argument('--do_kl_anneal', action="store_true", default=False, \
-            help='Do KL Annealing')
+                        help='Do KL Annealing')
     parser.add_argument("--clip_grad", action="store_true", default=False,
-		help='Gradient Clipping')
+                        help='Gradient Clipping')
     parser.add_argument("--clip_weight", action="store_true", default=False,
-		help='Weight Clipping')
+                        help='Weight Clipping')
     parser.add_argument("--use_gcn_sig", action="store_true", default=False,
-		help='Use GCN in Signature Function')
+                        help='Use GCN in Signature Function')
     parser.add_argument("--train_only_gs", action="store_true", default=False,
-		help='Train only the Graph Signature Function')
+                        help='Train only the Graph Signature Function')
     parser.add_argument("--random_baseline", action="store_true", default=False,
-		help='Use a Random Baseline')
+                        help='Use a Random Baseline')
     parser.add_argument("--adamic_adar_baseline", action="store_true", default=False,
-		help='Use Adamic-Adar Baseline')
-    parser.add_argument("--deepwalk_baseline", action ="store_true", default=False,
-        help = "Use Deepwalk Baseline")
-    parser.add_argument("--deepwalk_and_mlp", action ="store_true", default=False,
-        help = "Use Deepwalk Baseline and ML and MLPP")
+                        help='Use Adamic-Adar Baseline')
+    parser.add_argument("--deepwalk_baseline", action="store_true", default=False,
+                        help="Use Deepwalk Baseline")
+    parser.add_argument("--deepwalk_and_mlp", action="store_true", default=False,
+                        help="Use Deepwalk Baseline and ML and MLPP")
     parser.add_argument("--reprocess", action="store_true", default=False,
-		help='Reprocess AMINER dataset')
+                        help='Reprocess AMINER dataset')
     parser.add_argument("--ego", action="store_true", default=False,
-		help='Reprocess AMINER dataset as ego')
+                        help='Reprocess AMINER dataset as ego')
     parser.add_argument("--wl", action="store_true", default=False,
-		help='Run WL-Kernel on dataset')
+                        help='Run WL-Kernel on dataset')
     parser.add_argument("--comet", action="store_true", default=False,
-		help='Use comet for logging')
+                        help='Use comet for logging')
     parser.add_argument("--wandb", action="store_true", default=False,
-		help='Use wandb for logging')
+                        help='Use wandb for logging')
     parser.add_argument("--comet_username", type=str, default="joeybose",
-                help='Username for comet logging')
+                        help='Username for comet logging')
     parser.add_argument('--seed', type=int, default=123, metavar='S',
                         help='random seed (default: 1)')
-    parser.add_argument("--comet_apikey", type=str,\
-            help='Api for comet logging')
+    parser.add_argument("--comet_apikey", type=str, \
+                        help='Api for comet logging')
     parser.add_argument('--patience', type=int, default=40, help="Early Stopping")
     parser.add_argument('--debug', default=False, action='store_true',
                         help='Debug')
@@ -532,9 +532,10 @@ if __name__ == '__main__':
     parser.add_argument('--debug_name', type=str, default="one_maml_graph",
                         help='where to save/load')
     parser.add_argument('--namestr', type=str, default='Meta-Graph', \
-            help='additional info in output filename to describe experiments')
+                        help='additional info in output filename to describe experiments')
     parser.add_argument('--study_uid', type=str, default='')
-    parser.add_argument('--gating', type=str, default=None, choices=[None, 'signature', 'weights', 'signature_cond', 'weights_cond'])
+    parser.add_argument('--gating', type=str, default=None,
+                        choices=[None, 'signature', 'weights', 'signature_cond', 'weights_cond'])
     parser.add_argument('--layer_norm', default=False, action='store_true',
                         help='use layer norm')
     parser.add_argument('--apply_gae_only',  default= False, action='store_true', help='apply simple GAE')
@@ -543,7 +544,7 @@ if __name__ == '__main__':
     parser.add_argument('--drop_mode', type=str, default='equal', choices=['equal', 'weighted'], help='edges drop mode')
 
     parser.add_argument('--k', type=int, default=5, metavar='N', help='Num of nearest neighbors to use')
-    parser.add_argument('--emb_dims', type=int, default=512, metavar='N', help='Dimension of embeddings')
+    parser.add_argument('--emb_dims', type=int, default=16, metavar='N', help='Dimension of embeddings')
 
     args = parser.parse_args()
 

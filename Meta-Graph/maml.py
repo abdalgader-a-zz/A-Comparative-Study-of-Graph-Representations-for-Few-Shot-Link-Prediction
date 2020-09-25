@@ -108,17 +108,17 @@ def meta_gradient_step(model,
         fast_weights = OrderedDict(model.named_parameters())
         early_stopping = EarlyStopping(patience=args.patience, verbose=False)
 
+        if args.encoder == 'DGCNN':
+            x = x.unsqueeze(0).permute(0, 2, 1)
         # Train the model for `inner_train_steps` iterations
         for inner_batch in range(inner_train_steps):
             # Perform update of model weights
             if args.encoder == 'DGCNN':
-                # node_featuers, edge_index = nodes.to(device), edges.to(device)
-                # node_featuers, edge_index = Variable(node_featuers, requires_grad=True), Variable(edge_index)
-                node_featuers = x.unsqueeze(0).permute(0, 2, 1)
-                z = model.encode(node_featuers)
+                z = model.encode(x)
+                z = z.squeeze(0)
             else:
                 z = model.encode(x, train_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=True, train=train)
-                z = z.squeeze(0)
+
             loss = model.recon_loss(z, train_pos_edge_index)
             if args.model in ['VGAE']:
                 if not args.apply_gae_only:
@@ -173,7 +173,13 @@ def meta_gradient_step(model,
 
         # Do a pass of the model on the validation data from the current task
         val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
-        z_val = model.encode(x, val_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=False, train=train)
+        if args.encoder == 'DGCNN':
+            z_val = model.encode(x)
+            z_val = z_val.squeeze(0)
+        else:
+            z_val = model.encode(x, val_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=False, train=train)
+
+
         loss_val = model.recon_loss(z_val, val_pos_edge_index)
         if args.model in ['VGAE']:
             if not args.apply_gae_only:
