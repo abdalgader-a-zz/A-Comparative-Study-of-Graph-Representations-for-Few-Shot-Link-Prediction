@@ -91,3 +91,15 @@ def load_dataset(name,args):
     return train_loader,val_loader,test_loader
 
 
+# class PPI_v2(Dataset):
+#     def __init__(self, partition='train'):
+#         self.data = load_dataset('PPI', partition)
+#         self.num_classes = self.data.num_classes
+#         # self.num_features = self.data.data.num_features
+#
+#     def __getitem__(self, item):
+#         pointcloud = self.data[item]
+#         return pointcloud
+#
+#     def __len__(self):
+#         return len(self.data)

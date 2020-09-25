@@ -111,7 +111,14 @@ def meta_gradient_step(model,
         # Train the model for `inner_train_steps` iterations
         for inner_batch in range(inner_train_steps):
             # Perform update of model weights
-            z = model.encode(x, train_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=True, train=train)
+            if args.encoder == 'DGCNN':
+                # node_featuers, edge_index = nodes.to(device), edges.to(device)
+                # node_featuers, edge_index = Variable(node_featuers, requires_grad=True), Variable(edge_index)
+                node_featuers = x.unsqueeze(0).permute(0, 2, 1)
+                z = model.encode(node_featuers)
+            else:
+                z = model.encode(x, train_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=True, train=train)
+                z = z.squeeze(0)
             loss = model.recon_loss(z, train_pos_edge_index)
             if args.model in ['VGAE']:
                 if not args.apply_gae_only:

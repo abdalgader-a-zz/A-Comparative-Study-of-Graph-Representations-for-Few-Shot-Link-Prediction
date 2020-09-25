@@ -291,16 +291,24 @@ def validation(args,meta_model,optimizer,val_loader,train_epoch,return_val=False
         return max_auc, max_ap
 
 def main(args):
+
+    # select the model annd encoder...
     assert args.model in ['GAE', 'VGAE']
     kwargs = {'GAE': MyGAE, 'VGAE': MyVGAE}
     kwargs_enc = {'GCN': MetaEncoder, 'FC': MLPEncoder, 'MLP': MetaMLPEncoder,
                   'GraphSignature': MetaSignatureEncoder,
-                  'GatedGraphSignature': MetaGatedSignatureEncoder}
+                  'GatedGraphSignature': MetaGatedSignatureEncoder, 'DGCNN':DGCNN}
+    path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', args.dataset)
 
-    path = osp.join(
-        osp.dirname(osp.realpath(__file__)), '..', 'data', args.dataset)
+    # Load dataset ....
     train_loader, val_loader, test_loader = load_dataset(args.dataset,args)
-    meta_model = kwargs[args.model](kwargs_enc[args.encoder](args, args.num_features, args.num_channels)).to(args.dev)
+
+    # Intitiate the model ....
+    if args.encoder == 'DGCNN':
+        meta_model = kwargs[args.model](kwargs_enc[args.encoder](args, args.dev )).to(args.dev)
+    else:
+        meta_model = kwargs[args.model](kwargs_enc[args.encoder](args, args.num_features, args.num_channels)).to(args.dev)
+
     if args.train_only_gs:
         trainable_parameters = []
         for name, p in meta_model.named_parameters():
@@ -533,6 +541,9 @@ if __name__ == '__main__':
     parser.add_argument('--drop_edges', default=False, action='store_true', help='drop edges')
     parser.add_argument('--keep_prob', type=float, default= .5, help='edges keep probability')
     parser.add_argument('--drop_mode', type=str, default='equal', choices=['equal', 'weighted'], help='edges drop mode')
+
+    parser.add_argument('--k', type=int, default=5, metavar='N', help='Num of nearest neighbors to use')
+    parser.add_argument('--emb_dims', type=int, default=512, metavar='N', help='Dimension of embeddings')
 
     args = parser.parse_args()
 
