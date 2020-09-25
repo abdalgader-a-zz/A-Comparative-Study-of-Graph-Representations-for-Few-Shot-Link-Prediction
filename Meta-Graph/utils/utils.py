@@ -431,7 +431,11 @@ def subsample_edges(G, num_edges):
 def val(model, args, x, only_gae, val_pos_edge_index, num_nodes, weights):
     model.eval()
     with torch.no_grad():
-        z = model.encode(x, val_pos_edge_index, weights, only_gae=only_gae)
+        if args.encoder == 'DGCNN':
+            z = model.encode(x)
+            z = z.squeeze(0)
+        else:
+            z = model.encode(x, val_pos_edge_index, weights, only_gae=only_gae)
         loss = model.recon_loss(z, val_pos_edge_index)
         if args.model in ['VGAE']:
             loss = loss + (1 / num_nodes) * model.kl_loss()

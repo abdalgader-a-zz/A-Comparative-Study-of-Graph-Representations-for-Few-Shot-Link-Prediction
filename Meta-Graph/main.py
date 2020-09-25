@@ -406,7 +406,10 @@ def main(args):
                             sum(train_inner_avg_ap_list)/len(train_inner_avg_ap_list)))
 
         ''' Meta-Testing After every Epoch'''
-        meta_model_copy = kwargs[args.model](kwargs_enc[args.encoder](args, args.num_features, args.num_channels)).to(args.dev)
+        if args.encoder == 'DGCNN':
+            meta_model_copy = kwargs[args.model](kwargs_enc[args.encoder](args, args.dev)).to(args.dev)
+        else:
+            meta_model_copy = kwargs[args.model](kwargs_enc[args.encoder](args, args.num_features, args.num_channels)).to(args.dev)
         meta_model_copy.load_state_dict(meta_model.state_dict())
         if args.train_only_gs:
             optimizer_copy = torch.optim.Adam(trainable_parameters, lr=args.meta_lr)
