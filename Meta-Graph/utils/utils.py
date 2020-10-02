@@ -118,7 +118,7 @@ def test(model, x, train_pos_edge_index, only_gae, pos_edge_index, neg_edge_inde
     model.eval()
     with torch.no_grad():
         if model.encoder.args.encoder == 'DGCNN':
-            z = model.encode(x)
+            z = model.encode(x, weights)
             z = z.squeeze(0)
         else:
             z = model.encode(x, train_pos_edge_index, weights, only_gae=only_gae)
@@ -162,7 +162,7 @@ def global_test(args, model, data_batch, weights):
         with torch.no_grad():
             if args.encoder == 'DGCNN':
                 x = x.unsqueeze(0).permute(0, 2, 1)
-                z = model.encode(x)
+                z = model.encode(x, weights)
                 z = z.squeeze(0)
             else:
                 z = model.encode(x, train_pos_edge_index,weights, only_gae=args.apply_gae_only)
@@ -432,7 +432,7 @@ def val(model, args, x, only_gae, val_pos_edge_index, num_nodes, weights):
     model.eval()
     with torch.no_grad():
         if args.encoder == 'DGCNN':
-            z = model.encode(x)
+            z = model.encode(x, weights)
             z = z.squeeze(0)
         else:
             z = model.encode(x, val_pos_edge_index, weights, only_gae=only_gae)

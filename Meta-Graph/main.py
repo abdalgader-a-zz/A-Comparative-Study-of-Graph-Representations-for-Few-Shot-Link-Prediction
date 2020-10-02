@@ -318,6 +318,7 @@ def main(args):
                 p.requires_grad = False
         optimizer = torch.optim.Adam(trainable_parameters, lr=args.meta_lr)
     else:
+        # optimizer = torch.optim.SGD(meta_model.parameters(), lr=args.meta_lr * 100, momentum=args.momentum, weight_decay=1e-4)
         optimizer = torch.optim.Adam(meta_model.parameters(), lr=args.meta_lr)
 
     total_loss = 0
@@ -548,6 +549,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--k', type=int, default=5, metavar='N', help='Num of nearest neighbors to use')
     parser.add_argument('--emb_dims', type=int, default=16, metavar='N', help='Dimension of embeddings')
+    parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
+                        help='SGD momentum (default: 0.9)')
 
     args = parser.parse_args()
 

@@ -14,7 +14,7 @@ from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.utils import add_remaining_self_loops
 from torch.distributions import Normal
 from torch import nn
-from .layers import MetaGCNConv, MetaGatedGraphConv, MetaGRUCell, MetaGatedGCNConv
+from .layers import MetaGCNConv, MetaGatedGraphConv, MetaGRUCell, MetaGatedGCNConv, DGConv2d, DGConv1d
 import torch.nn.functional as F
 from utils.utils import uniform
 from utils.edge_drop import EdgeDrop, DropMode
@@ -66,66 +66,131 @@ def get_graph_feature(x, k=20, idx=None):
 
     return feature
 
+# class DGCNN(torch.nn.Module):
+#     def __init__(self, args, output_channels=40):
+#         super(DGCNN, self).__init__()
+#         self.args = args
+#         self.k = args.k
+#
+#         self.bn1 = nn.BatchNorm2d(64)
+#         self.bn2 = nn.BatchNorm2d(64)
+#         self.bn3 = nn.BatchNorm2d(128)
+#         self.bn4 = nn.BatchNorm2d(256)
+#         self.bn5 = nn.BatchNorm1d(256)
+#         self.bn6 = nn.BatchNorm1d(args.emb_dims)
+#         self.bn7 = nn.BatchNorm1d(1024)
+#
+#         self.conv1 = nn.Sequential(DGConv2d(120, 64, kernel_size=1, bias=False),
+#                                    self.bn1,
+#                                    nn.LeakyReLU(negative_slope=0.2))
+#
+#         self.conv2 = nn.Sequential(DGConv2d(64 * 2, 64, kernel_size=1, bias=False),
+#                                    self.bn2,
+#                                    nn.LeakyReLU(negative_slope=0.2))
+#         self.conv3 = nn.Sequential(DGConv2d(64 * 2, 128, kernel_size=1, bias=False),
+#                                    self.bn3,
+#                                    nn.LeakyReLU(negative_slope=0.2))
+#         self.conv4 = nn.Sequential(DGConv2d(128 * 2, 256, kernel_size=1, bias=False),
+#                                    self.bn4,
+#                                    nn.LeakyReLU(negative_slope=0.2))
+#
+#         self.conv5 = nn.Sequential(DGConv1d(512, 256, kernel_size=1, bias=False),
+#                                    self.bn5,
+#                                    nn.LeakyReLU(negative_slope=0.2))
+#
+#         self.conv6 = nn.Sequential(DGConv1d(256, args.emb_dims, kernel_size=1, bias=False),
+#                                    self.bn6,
+#                                    nn.LeakyReLU(negative_slope=0.2))
+#
+#
+#
+#     def forward(self, x, weights):
+#
+#         batch_size = x.size(0)
+#         x = get_graph_feature(x, k=self.k)
+#         x = self.conv1(x, weights['encoder.conv1.0.weight'])
+#         x1 = x.max(dim=-1, keepdim=False)[0]
+#
+#         x = get_graph_feature(x1, k=self.k)
+#         x = self.conv2(x, weights['encoder.conv2.0.weight'])
+#         x2 = x.max(dim=-1, keepdim=False)[0]
+#
+#         x = get_graph_feature(x2, k=self.k)
+#         x = self.conv3(x, weights['encoder.conv3.0.weight'])
+#         x3 = x.max(dim=-1, keepdim=False)[0]
+#
+#         x = get_graph_feature(x3, k=self.k)
+#         x = self.conv4(x, weights['encoder.conv4.0.weight'])
+#         x4 = x.max(dim=-1, keepdim=False)[0]
+#
+#         x = torch.cat((x1, x2, x3, x4), dim=1)
+#
+#         x = self.conv5(x, weights['encoder.conv5.0.weight'])
+#         x = self.conv6(x, weights['encoder.conv6.0.weight'])
+#         x = x.permute(0, 2, 1)
+#
+#         # x = F.leaky_relu(self.linear1(x), negative_slope=0.2)
+#         # x = F.leaky_relu(self.linear2(x), negative_slope=0.2)
+#         return x
+
+
 class DGCNN(torch.nn.Module):
     def __init__(self, args, output_channels=40):
         super(DGCNN, self).__init__()
         self.args = args
         self.k = args.k
 
+
+        self.LReLU = nn.LeakyReLU(negative_slope=0.2)
+
+        self.conv1 = DGConv2d(120, 64, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
+
+
+        self.conv2 = DGConv2d(64 * 2, 64, kernel_size=1, bias=False)
         self.bn2 = nn.BatchNorm2d(64)
+
+        self.conv3 = DGConv2d(64 * 2, 128, kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(128)
+
+        self.conv4 = DGConv2d(128 * 2, 256, kernel_size=1, bias=False)
         self.bn4 = nn.BatchNorm2d(256)
+
+
+        self.conv5 = DGConv1d(512, 256, kernel_size=1, bias=False)
         self.bn5 = nn.BatchNorm1d(256)
+
+
+        self.conv6 = DGConv1d(256, args.emb_dims, kernel_size=1, bias=False)
         self.bn6 = nn.BatchNorm1d(args.emb_dims)
-        self.bn7 = nn.BatchNorm1d(1024)
-
-        self.conv1 = nn.Sequential(nn.Conv2d(120, 64, kernel_size=1, bias=False),
-                                   self.bn1,
-                                   nn.LeakyReLU(negative_slope=0.2))
-
-        self.conv2 = nn.Sequential(nn.Conv2d(64 * 2, 64, kernel_size=1, bias=False),
-                                   self.bn2,
-                                   nn.LeakyReLU(negative_slope=0.2))
-        self.conv3 = nn.Sequential(nn.Conv2d(64 * 2, 128, kernel_size=1, bias=False),
-                                   self.bn3,
-                                   nn.LeakyReLU(negative_slope=0.2))
-        self.conv4 = nn.Sequential(nn.Conv2d(128 * 2, 256, kernel_size=1, bias=False),
-                                   self.bn4,
-                                   nn.LeakyReLU(negative_slope=0.2))
-
-        self.conv5 = nn.Sequential(nn.Conv1d(512, 256, kernel_size=1, bias=False),
-                                   self.bn5,
-                                   nn.LeakyReLU(negative_slope=0.2))
-
-        self.conv6 = nn.Sequential(nn.Conv1d(256, args.emb_dims, kernel_size=1, bias=False),
-                                   self.bn6,
-                                   nn.LeakyReLU(negative_slope=0.2))
 
 
 
-    def forward(self, x):
+
+    def forward(self, x, weights):
+
         batch_size = x.size(0)
         x = get_graph_feature(x, k=self.k)
-        x = self.conv1(x)
+        x = self.LReLU(self.bn1(self.conv1(x, weights['encoder.conv1.weight'])))
         x1 = x.max(dim=-1, keepdim=False)[0]
 
         x = get_graph_feature(x1, k=self.k)
-        x = self.conv2(x)
+        x = self.LReLU(self.bn2(self.conv2(x, weights['encoder.conv2.weight'])))
         x2 = x.max(dim=-1, keepdim=False)[0]
 
         x = get_graph_feature(x2, k=self.k)
-        x = self.conv3(x)
+        x = self.LReLU(self.bn3(self.conv3(x, weights['encoder.conv3.weight'])))
         x3 = x.max(dim=-1, keepdim=False)[0]
 
         x = get_graph_feature(x3, k=self.k)
-        x = self.conv4(x)
+        x = self.LReLU(self.bn4(self.conv4(x, weights['encoder.conv4.weight'])))
         x4 = x.max(dim=-1, keepdim=False)[0]
 
         x = torch.cat((x1, x2, x3, x4), dim=1)
 
-        x = self.conv5(x)
-        x = self.conv6(x)
+        x = self.LReLU(self.bn5(self.conv5(x, weights['encoder.conv5.weight'])))
+        x = self.LReLU(self.bn6(self.conv6(x, weights['encoder.conv6.weight'])))
+
         x = x.permute(0, 2, 1)
 
         # x = F.leaky_relu(self.linear1(x), negative_slope=0.2)

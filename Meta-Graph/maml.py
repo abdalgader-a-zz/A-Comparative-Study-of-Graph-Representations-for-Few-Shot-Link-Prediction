@@ -114,7 +114,7 @@ def meta_gradient_step(model,
         for inner_batch in range(inner_train_steps):
             # Perform update of model weights
             if args.encoder == 'DGCNN':
-                z = model.encode(x)
+                z = model.encode(x, fast_weights)
                 z = z.squeeze(0)
             else:
                 z = model.encode(x, train_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=True, train=train)
@@ -174,7 +174,7 @@ def meta_gradient_step(model,
         # Do a pass of the model on the validation data from the current task
         val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
         if args.encoder == 'DGCNN':
-            z_val = model.encode(x)
+            z_val = model.encode(x, fast_weights)
             z_val = z_val.squeeze(0)
         else:
             z_val = model.encode(x, val_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=False, train=train)
