@@ -387,7 +387,7 @@ def main(args):
 
             if args.wandb:
                 wandb.log()
-
+        ######################################## pass graph by graph ############################################
         if args.comet:
             if len(train_inner_avg_ap_list) > 0:
                 auc_metric = 'Train_Inner_Avg' +'_AUC'
@@ -419,6 +419,9 @@ def main(args):
         optimizer_copy.load_state_dict(optimizer.state_dict())
         validation(args,meta_model_copy,optimizer_copy,val_loader,epoch)
         test(args,meta_model_copy,optimizer_copy,test_loader,epoch,inner_steps=args.inner_steps)
+    #####################EPOCHS############################################################################
+
+
 
     print("Failed on %d Training graphs" %(args.fail_counter))
 

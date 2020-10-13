@@ -9,6 +9,7 @@ from torchviz import make_dot
 import ipdb
 import wandb
 from copy import deepcopy
+from operator import add
 
 def replace_grad(parameter_gradients, parameter_name):
     def replace_grad_(module):
@@ -129,6 +130,7 @@ def meta_gradient_step(model,
                 gradients = torch.autograd.grad(loss, fast_weights.values(),\
                         allow_unused=args.allow_unused, create_graph=create_graph)
                 gradients = [0 if grad is None else grad  for grad in gradients]
+                # gradients = list(map(add, len(gradients)*[0.3], gradients)) #to check how the the gradient behave
                 if args.wandb:
                     wandb.log({"Inner_Train_loss":loss.item()})
 
@@ -170,6 +172,7 @@ def meta_gradient_step(model,
                 inner_test_auc_array[graph_id][my_step:,] = inner_test_auc
                 inner_test_ap_array[graph_id][my_step:,] = inner_test_ap
                 break
+        ###############################end of inner steps loop #################################
 
         # Do a pass of the model on the validation data from the current task
         val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
@@ -178,7 +181,6 @@ def meta_gradient_step(model,
             z_val = z_val.squeeze(0)
         else:
             z_val = model.encode(x, val_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=False, train=train)
-
 
         loss_val = model.recon_loss(z_val, val_pos_edge_index)
         if args.model in ['VGAE']:
@@ -198,7 +200,7 @@ def meta_gradient_step(model,
 
         # Get post-update accuracies
         auc, ap = test(model, x, train_pos_edge_index, args.apply_gae_only,
-                data.test_pos_edge_index, data.test_neg_edge_index,fast_weights)
+                    data.test_pos_edge_index, data.test_neg_edge_index,fast_weights)
 
         auc_list.append(auc)
         ap_list.append(ap)
