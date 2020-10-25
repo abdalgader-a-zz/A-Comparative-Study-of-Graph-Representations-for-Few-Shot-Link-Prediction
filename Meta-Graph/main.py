@@ -423,9 +423,9 @@ def main(args):
         if not os.path.exists('./checkpoints/'):
             os.makedirs('./checkpoints/')
         early_stopping_val(val_loss, meta_model)
-        if early_stopping_val.early_stop:
-            print("Early stopping")
-            break
+        # if early_stopping_val.early_stop:
+        #     print("Early stopping")
+        #     break
 
 
 
@@ -434,7 +434,8 @@ def main(args):
 
 
     'Load the last checkpoint with best_model'
-    # meta_model.load_state_dict(torch.load('./checkpoints/checkpoint.pt'))
+    print('Load the model in the checkpoint....')
+    meta_model.load_state_dict(torch.load('./checkpoints/checkpoint.pt'))
 
     ''' Save Global Params '''
     if not os.path.exists('../saved_models/'):
@@ -444,6 +445,7 @@ def main(args):
     torch.save(meta_model.state_dict(), save_path)
 
     ''' Run to Convergence '''
+    print(40 * '#', 'Run to Convergence', 40 * '#')
     if args.ego:
         optimizer = torch.optim.Adam(meta_model.parameters(), lr=args.meta_lr)
         args.inner_lr = args.inner_lr * args.reset_inner_factor
