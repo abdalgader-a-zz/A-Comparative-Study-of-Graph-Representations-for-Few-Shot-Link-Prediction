@@ -162,6 +162,53 @@ def global_test(args, model, data_batch, weights):
         ap_list.append(ap)
     return auc_list, ap_list
 
+
+def global_val_test(args, model, data_batch, weights):
+    model.eval()
+    auc_list, ap_list, val_loss_list = [], [], []
+    for data in data_batch:
+        data.train_mask = data.val_mask = data.test_mask = data.y = None
+        data.batch = None
+        # Test Ratio is Fixed at 0.1
+        meta_test_edge_ratio = 1 - args.meta_val_edge_ratio - args.meta_train_edge_ratio
+        if args.use_fixed_feats and args.dataset=='REDDIT-MULTI-12K':
+            ##TODO: Should this be a fixed embedding table instead of generating this each time?
+            num_nodes = data.num_nodes
+            perm = torch.randperm(args.feats.size(0))
+            perm_idx = perm[:num_nodes]
+            data.x = args.feats[perm_idx]
+        elif args.use_same_fixed_feats and args.dataset=='REDDIT-MULTI-12K':
+            node_feats = args.feats[0].unsqueeze(0).repeat(num_nodes,1)
+            data.x = node_feats
+        try:
+            x, train_pos_edge_index = data.x.to(args.dev), data.train_pos_edge_index.to(args.dev)
+        except:
+            data = model.split_edges(data,val_ratio=args.meta_val_edge_ratio,test_ratio=meta_test_edge_ratio)
+            x, train_pos_edge_index = data.x.to(args.dev), data.train_pos_edge_index.to(args.dev)
+        try:
+            pos_edge_index, neg_edge_index = data.test_pos_edge_index, data.test_neg_edge_index
+        except:
+            print("Failed in Global Test")
+            args.fail_counter += 1
+            continue
+
+        # Additional Failure Checks for small graphs
+        if pos_edge_index.size()[1] == 0 or neg_edge_index.size()[1] == 0:
+            args.fail_counter += 1
+            print("Failed on Graph")
+            continue
+
+        with torch.no_grad():
+            z = model.encode(x, train_pos_edge_index,weights, only_gae=args.apply_gae_only)
+
+        val_loss = model.recon_loss(z, train_pos_edge_index)
+        auc, ap = model.test(z, pos_edge_index, neg_edge_index)
+
+        val_loss_list.append(val_loss)
+        auc_list.append(auc)
+        ap_list.append(ap)
+    return auc_list, ap_list, val_loss_list
+
 def filter_dataset(dataset,min_nodes,max_nodes):
     filtered_dataset = []
     for i, graph in enumerate(dataset):
@@ -466,7 +513,7 @@ class EarlyStopping:
         '''Saves model when validation loss decrease.'''
         if self.verbose:
             print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-        torch.save(model.state_dict(), 'checkpoint.pt')
+        torch.save(model.state_dict(), './checkpoints/checkpoint.pt')
         self.val_loss_min = val_loss
 
 def create_masked_networkx_graph(data):

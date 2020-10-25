@@ -14,7 +14,7 @@ from models.autoencoder import MyGAE, MyVGAE
 from torch_geometric.data import DataLoader
 from maml import meta_gradient_step
 from models.models import *
-from utils.utils import global_test, test, EarlyStopping, seed_everything,\
+from utils.utils import global_test, global_val_test, test, EarlyStopping, seed_everything,\
         filter_state_dict, create_nx_graph, calc_adamic_adar_score,\
         create_nx_graph_deepwalk, train_deepwalk_model,calc_deepwalk_score
 from utils.utils import run_analysis
@@ -205,7 +205,7 @@ def validation(args,meta_model,optimizer,val_loader,train_epoch,return_val=False
     args.resplit = True
     epoch=0
     meta_loss = torch.Tensor([0])
-    val_avg_auc_list, val_avg_ap_list = [], []
+    val_avg_auc_list, val_avg_ap_list, val_avg_losses = [], [], []
     val_inner_avg_auc_list, val_inner_avg_ap_list = [], []
     args.final_val = False
     inner_val_auc_array = None
@@ -221,7 +221,9 @@ def validation(args,meta_model,optimizer,val_loader,train_epoch,return_val=False
                     args,data,optimizer,args.inner_steps,args.inner_lr,args.order,val_graph_id_local,mode,\
                     val_inner_avg_auc_list,val_inner_avg_ap_list,epoch,j,False,\
                             inner_val_auc_array,inner_val_ap_array)
-        auc_list, ap_list = global_test(args,meta_model,data,OrderedDict(meta_model.named_parameters()))
+
+        auc_list, ap_list, val_loss = global_val_test(args,meta_model,data,OrderedDict(meta_model.named_parameters()))
+        val_avg_losses.append(sum(val_loss) / len(val_loss))
         val_avg_auc_list.append(sum(auc_list)/len(auc_list))
         val_avg_ap_list.append(sum(ap_list)/len(ap_list))
         if args.comet:
@@ -264,6 +266,7 @@ def validation(args,meta_model,optimizer,val_loader,train_epoch,return_val=False
                     inner_ap_metric:sum(val_inner_avg_ap_list)/len(val_inner_avg_ap_list),\
                     "x":epoch},commit=False)
 
+
     if return_val:
         val_avg_auc = sum(val_avg_auc_list)/len(val_avg_auc_list)
         val_avg_ap = sum(val_avg_ap_list)/len(val_avg_ap_list)
@@ -289,6 +292,8 @@ def validation(args,meta_model,optimizer,val_loader,train_epoch,return_val=False
                 wandb.log({auc_metric:auc,ap_metric:ap,"x":val_idx})
         print("Val Max AUC :%f | Val Max AP: %f" %(max_auc,max_ap))
         return max_auc, max_ap
+
+    return (sum(val_avg_losses) / len(val_avg_losses))
 
 def main(args):
     assert args.model in ['GAE', 'VGAE']
@@ -339,6 +344,10 @@ def main(args):
     mode = 'Train'
     meta_loss = torch.Tensor([0])
     args.final_test = False
+
+    early_stopping_val = EarlyStopping(patience=args.val_patience, verbose=True)
+
+
     for epoch in range(0,args.epochs):
         graph_id_local = 0
         graph_id_global = 0
@@ -405,10 +414,25 @@ def main(args):
         else:
             optimizer_copy = torch.optim.Adam(meta_model_copy.parameters(), lr=args.meta_lr)
         optimizer_copy.load_state_dict(optimizer.state_dict())
-        validation(args,meta_model_copy,optimizer_copy,val_loader,epoch)
+        val_loss = validation(args,meta_model_copy,optimizer_copy,val_loader,epoch)
         test(args,meta_model_copy,optimizer_copy,test_loader,epoch,inner_steps=args.inner_steps)
 
+        'Early stopping check after each epoch, check if the val loss is decresed. ' \
+        'If it has it, make a checkpoint of current model'
+
+        early_stopping_val(val_loss, meta_model)
+        if early_stopping_val.early_stop:
+            print("Early stopping")
+            break
+
+
+
+    print(40*'#', 'End Training', 40*'#')
     print("Failed on %d Training graphs" %(args.fail_counter))
+
+
+    'Load the last checkpoint with best_model'
+    # meta_model.load_state_dict(torch.load('./checkpoints/checkpoint.pt'))
 
     ''' Save Global Params '''
     if not os.path.exists('../saved_models/'):
@@ -517,6 +541,7 @@ if __name__ == '__main__':
     parser.add_argument("--comet_apikey", type=str,\
             help='Api for comet logging')
     parser.add_argument('--patience', type=int, default=40, help="Early Stopping")
+    parser.add_argument('--val_patience', type=int, default=40, help="Early Stopping for Validation- global model")
     parser.add_argument('--debug', default=False, action='store_true',
                         help='Debug')
     parser.add_argument('--opus', default=False, action='store_true',
@@ -548,7 +573,7 @@ if __name__ == '__main__':
 
     args.dev = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     if args.dataset=='PPI':
-        project_name = 'meta-graph-ppi'
+        project_name = 'track-mata-graph'
     elif args.dataset=='REDDIT-MULTI-12K':
         project_name = "meta-graph-reddit"
     elif args.dataset=='FIRSTMM_DB':
