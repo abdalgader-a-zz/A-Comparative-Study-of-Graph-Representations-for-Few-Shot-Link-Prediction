@@ -420,6 +420,8 @@ def main(args):
         'Early stopping check after each epoch, check if the val loss is decresed. ' \
         'If it has it, make a checkpoint of current model'
 
+        if not os.path.exists('./checkpoints/'):
+            os.makedirs('./checkpoints/')
         early_stopping_val(val_loss, meta_model)
         if early_stopping_val.early_stop:
             print("Early stopping")
