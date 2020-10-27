@@ -135,11 +135,12 @@ def meta_gradient_step(model,
 
             ''' Only do this if its the final test set eval '''
             if args.final_test and inner_batch % 5 ==0:
+
                 inner_test_auc, inner_test_ap = test(model, x, train_pos_edge_index, args.apply_gae_only,
                         data.test_pos_edge_index, data.test_neg_edge_index,fast_weights)
                 val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
                 val_loss = val(model,args, x, args.apply_gae_only,val_pos_edge_index,data.num_nodes,fast_weights)
-                early_stopping(val_loss, model)
+                early_stopping(val_loss, model, args)
                 my_step = int(inner_batch / 5)
                 inner_test_auc_array[graph_id][my_step] = inner_test_auc
                 inner_test_ap_array[graph_id][my_step] = inner_test_ap

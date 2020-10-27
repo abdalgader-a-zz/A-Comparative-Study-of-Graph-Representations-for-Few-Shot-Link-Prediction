@@ -422,7 +422,7 @@ def main(args):
 
         if not os.path.exists('./checkpoints/'):
             os.makedirs('./checkpoints/')
-        early_stopping_val(val_loss, meta_model)
+        early_stopping_val(val_loss, meta_model, args)
         # if early_stopping_val.early_stop:
         #     print("Early stopping")
         #     break
@@ -434,8 +434,8 @@ def main(args):
 
 
     'Load the last checkpoint with best_model'
-    print('Load the model in the checkpoint....')
-    meta_model.load_state_dict(torch.load('./checkpoints/checkpoint.pt'))
+    print(f'Load the model in the checkpoint ({args.meta_train_edge_ratio})(-{args.seed}).pt....')
+    meta_model.load_state_dict(torch.load(f'./checkpoints/checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt'))
 
     ''' Save Global Params '''
     if not os.path.exists('../saved_models/'):
@@ -450,12 +450,12 @@ def main(args):
         optimizer = torch.optim.Adam(meta_model.parameters(), lr=args.meta_lr)
         args.inner_lr = args.inner_lr * args.reset_inner_factor
     val_inner_avg_auc, val_inner_avg_ap = test(args,meta_model,optimizer,val_loader,epoch,\
-            return_val=True,inner_steps=1000)
+            return_val=True,inner_steps=10)
     if args.ego:
         optimizer = torch.optim.Adam(meta_model.parameters(), lr=args.meta_lr)
         args.inner_lr = args.inner_lr * args.reset_inner_factor
     test_inner_avg_auc, test_inner_avg_ap = test(args,meta_model,optimizer,test_loader,epoch,\
-            return_val=True,inner_steps=1000)
+            return_val=True,inner_steps=10)
     if args.comet:
         args.experiment.end()
 

@@ -495,7 +495,7 @@ class EarlyStopping:
         self.val_loss_min = np.Inf
         self.delta = delta
 
-    def __call__(self, val_loss, model):
+    def __call__(self, val_loss, model, args, final=False):
         score = -val_loss
         if self.best_score is None:
             self.best_score = score
@@ -506,14 +506,20 @@ class EarlyStopping:
                 self.early_stop = True
         else:
             self.best_score = score
-            self.save_checkpoint(val_loss, model)
+            if not final:
+                self.save_checkpoint(val_loss, model, args)
+            else:
+                self.save_checkpoint(val_loss, model, args, final)
             self.counter = 0
 
-    def save_checkpoint(self, val_loss, model):
+    def save_checkpoint(self, val_loss, model, args, final=False):
         '''Saves model when validation loss decrease.'''
         if self.verbose:
             print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-        torch.save(model.state_dict(), './checkpoints/checkpoint.pt')
+        if not final:
+            torch.save(model.state_dict(), f'./checkpoints/checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt')
+        else:
+            torch.save(model.state_dict(), f'./checkpoints/final_checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt')
         self.val_loss_min = val_loss
 
 def create_masked_networkx_graph(data):
