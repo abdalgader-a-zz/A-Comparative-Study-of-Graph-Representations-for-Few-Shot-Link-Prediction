@@ -152,12 +152,12 @@ class MetaSignatureEncoder(torch.nn.Module):
             self.cache_sig_out = [sig_gamma_1,sig_beta_1,sig_gamma_2,sig_beta_2]
 
         x = F.relu(self.conv1(x, edge_index, weights['encoder.conv1.weight'],\
-                weights['encoder.conv1.bias'], gamma=None, beta=None))
+                weights['encoder.conv1.bias'], gamma=None, beta=None)) # put gamma=sig_gamma_1, beta=sig_beta_1 if use sig
         if self.args.layer_norm:
             x = nn.LayerNorm(x.size()[1:], elementwise_affine=False)(x)
         if self.args.model in ['GAE']:
             x = self.conv2(x, edge_index,weights['encoder.conv2.weight'],\
-                    weights['encoder.conv2.bias'],gamma=None, beta=None)
+                    weights['encoder.conv2.bias'],gamma=None, beta=None) # put gamma=sig_gamma_2, beta=sig_beta_2 if use sig
             if self.args.layer_norm:
                 x = nn.LayerNorm(x.size()[1:], elementwise_affine=False)(x)
             return x
