@@ -140,7 +140,7 @@ def meta_gradient_step(model,
                         data.test_pos_edge_index, data.test_neg_edge_index,fast_weights)
                 val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
                 val_loss = val(model,args, x, args.apply_gae_only,val_pos_edge_index,data.num_nodes,fast_weights)
-                early_stopping(val_loss, model, args)
+                early_stopping(val_loss, model, args, final=True)
                 my_step = int(inner_batch / 5)
                 inner_test_auc_array[graph_id][my_step] = inner_test_auc
                 inner_test_ap_array[graph_id][my_step] = inner_test_ap
