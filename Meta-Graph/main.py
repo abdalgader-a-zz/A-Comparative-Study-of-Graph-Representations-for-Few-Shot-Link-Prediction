@@ -115,7 +115,7 @@ def test(args,meta_model,optimizer,test_loader,train_epoch,return_val=False,inne
         if not args.random_baseline and not args.adamic_adar_baseline:
             test_graph_id_local, meta_loss, test_inner_avg_auc_list, test_inner_avg_ap_list = meta_gradient_step(meta_model,\
                     args,data,optimizer,args.inner_steps,args.inner_lr,args.order,test_graph_id_local,mode,\
-                    test_inner_avg_auc_list, test_inner_avg_ap_list,epoch,j,False,\
+                    test_inner_avg_auc_list, test_inner_avg_ap_list,train_epoch,j,False,\
                             inner_test_auc_array,inner_test_ap_array)
         auc_list, ap_list = global_test(args,meta_model,data,OrderedDict(meta_model.named_parameters()))
         test_avg_auc_list.append(sum(auc_list)/len(auc_list))
@@ -133,7 +133,7 @@ def test(args,meta_model,optimizer,test_loader,train_epoch,return_val=False,inne
                 auc_metric = 'Test_Outer_Batch_Graph_' + str(j) +'_AUC'
                 ap_metric = 'Test_Outer_Batch_Graph_' + str(j) +'_AP'
                 wandb.log({auc_metric:sum(auc_list)/len(auc_list),\
-                        ap_metric:sum(ap_list)/len(ap_list),"x":epoch},commit=False)
+                        ap_metric:sum(ap_list)/len(ap_list),"x":train_epoch},commit=False)
 
     print("Failed on %d graphs" %(args.fail_counter))
     print("Epoch: %d | Test Global Avg Auc %f | Test Global Avg AP %f" \
@@ -203,7 +203,7 @@ def validation(args,meta_model,optimizer,val_loader,train_epoch,return_val=False
     val_graph_id_local = 0
     val_graph_id_global = 0
     args.resplit = True
-    epoch=0
+    # epoch=0
     meta_loss = torch.Tensor([0])
     val_avg_auc_list, val_avg_ap_list, val_avg_losses = [], [], []
     val_inner_avg_auc_list, val_inner_avg_ap_list = [], []
@@ -219,7 +219,7 @@ def validation(args,meta_model,optimizer,val_loader,train_epoch,return_val=False
         if not args.random_baseline:
             val_graph_id_local, meta_loss, val_inner_avg_auc_list, val_inner_avg_ap_list = meta_gradient_step(meta_model,\
                     args,data,optimizer,args.inner_steps,args.inner_lr,args.order,val_graph_id_local,mode,\
-                    val_inner_avg_auc_list,val_inner_avg_ap_list,epoch,j,False,\
+                    val_inner_avg_auc_list,val_inner_avg_ap_list,train_epoch,j,False,\
                             inner_val_auc_array,inner_val_ap_array)
 
         auc_list, ap_list, val_loss = global_val_test(args,meta_model,data,OrderedDict(meta_model.named_parameters()))
@@ -237,7 +237,7 @@ def validation(args,meta_model,optimizer,val_loader,train_epoch,return_val=False
                 auc_metric = 'Val_Batch_Graph_' + str(j) +'_AUC'
                 ap_metric = 'Val_Batch_Graph_' + str(j) +'_AP'
                 wandb.log({auc_metric:sum(auc_list)/len(auc_list),\
-                        ap_metric:sum(ap_list)/len(ap_list),"x":epoch},commit=False)
+                        ap_metric:sum(ap_list)/len(ap_list),"x":train_epoch},commit=False)
 
     print("Val Avg Auc %f | Val Avg AP %f" %(sum(val_avg_auc_list)/len(val_avg_auc_list),\
             sum(val_avg_ap_list)/len(val_avg_ap_list)))
@@ -264,7 +264,7 @@ def validation(args,meta_model,optimizer,val_loader,train_epoch,return_val=False
                     ap_metric:sum(val_avg_ap_list)/len(val_avg_ap_list),\
                     inner_auc_metric:sum(val_inner_avg_auc_list)/len(val_inner_avg_auc_list),\
                     inner_ap_metric:sum(val_inner_avg_ap_list)/len(val_inner_avg_ap_list),\
-                    "x":epoch},commit=False)
+                    "x":train_epoch},commit=False)
 
 
     if return_val:
