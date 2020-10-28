@@ -517,9 +517,9 @@ class EarlyStopping:
         if self.verbose:
             print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
         if not final:
-            torch.save(model.state_dict(), f'./checkpoints/checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt')
+            torch.save(model.state_dict(), f'./checkpoints/sig_checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt')
         else:
-            torch.save(model.state_dict(), f'./checkpoints/final_checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt')
+            torch.save(model.state_dict(), f'./checkpoints/sig_final_checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt')
         self.val_loss_min = val_loss
 
 def create_masked_networkx_graph(data):

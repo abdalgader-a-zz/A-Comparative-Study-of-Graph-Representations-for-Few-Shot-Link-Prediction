@@ -435,7 +435,7 @@ def main(args):
 
     'Load the last checkpoint with best_model'
     print(f'Load the model in the checkpoint ({args.meta_train_edge_ratio})(-{args.seed}).pt....')
-    meta_model.load_state_dict(torch.load(f'./checkpoints/checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt'))
+    meta_model.load_state_dict(torch.load(f'./checkpoints/sig_checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt'))
 
     ''' Save Global Params '''
     if not os.path.exists('../saved_models/'):
