@@ -455,12 +455,12 @@ def main(args):
         optimizer = torch.optim.Adam(meta_model.parameters(), lr=args.meta_lr)
         args.inner_lr = args.inner_lr * args.reset_inner_factor
     val_inner_avg_auc, val_inner_avg_ap = test(args,meta_model,optimizer,val_loader,epoch,\
-            return_val=True,inner_steps=10)
+            return_val=True,inner_steps=1000)
     if args.ego:
         optimizer = torch.optim.Adam(meta_model.parameters(), lr=args.meta_lr)
         args.inner_lr = args.inner_lr * args.reset_inner_factor
     test_inner_avg_auc, test_inner_avg_ap = test(args,meta_model,optimizer,test_loader,epoch,\
-            return_val=True,inner_steps=10)
+            return_val=True,inner_steps=1000)
     if args.comet:
         args.experiment.end()
 
