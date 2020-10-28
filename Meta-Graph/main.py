@@ -415,6 +415,7 @@ def main(args):
             optimizer_copy = torch.optim.Adam(meta_model_copy.parameters(), lr=args.meta_lr)
         optimizer_copy.load_state_dict(optimizer.state_dict())
         val_loss = validation(args,meta_model_copy,optimizer_copy,val_loader,epoch)
+        print(f'The average validation loss in Epoch {epoch} is ---- {val_loss}')
         test(args,meta_model_copy,optimizer_copy,test_loader,epoch,inner_steps=args.inner_steps)
 
         'Early stopping check after each epoch, check if the val loss is decresed. ' \
@@ -434,8 +435,12 @@ def main(args):
 
 
     'Load the last checkpoint with best_model'
-    print(f'Load the model in the checkpoint ({args.meta_train_edge_ratio})(-{args.seed}).pt....')
-    meta_model.load_state_dict(torch.load(f'./checkpoints/sig_checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt'))
+
+    if os.path.isfile(f'./checkpoints/sig_checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt') == True:
+        print(f'Load the model in the sig_checkpoint ({args.meta_train_edge_ratio})(-{args.seed}).pt....')
+        meta_model.load_state_dict(torch.load(f'./checkpoints/sig_checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt'))
+    else:
+        print('No checkpoint saved')
 
     ''' Save Global Params '''
     if not os.path.exists('../saved_models/'):
