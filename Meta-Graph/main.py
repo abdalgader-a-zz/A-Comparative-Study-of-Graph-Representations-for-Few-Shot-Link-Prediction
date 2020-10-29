@@ -377,16 +377,16 @@ def main(args):
                     ap_metric = 'Train_Global_Batch_Graph_' + str(i) +'_AP'
                     args.experiment.log_metric(auc_metric,sum(auc_list)/len(auc_list),step=epoch)
                     args.experiment.log_metric(ap_metric,sum(ap_list)/len(ap_list),step=epoch)
-            if args.wandb:
-                if len(ap_list) > 0:
-                        auc_metric = 'Train_Global_Batch_Graph_' + str(i) +'_AUC'
-                        ap_metric = 'Train_Global_Batch_Graph_' + str(i) +'_AP'
-                        wandb.log({auc_metric:sum(auc_list)/len(auc_list),\
-                                ap_metric:sum(ap_list)/len(ap_list),"x":epoch},commit=False)
+            # if args.wandb:
+            #     if len(ap_list) > 0:
+            #             auc_metric = 'Train_Global_Batch_Graph_' + str(i) +'_AUC'
+            #             ap_metric = 'Train_Global_Batch_Graph_' + str(i) +'_AP'
+            #             wandb.log({auc_metric:sum(auc_list)/len(auc_list),\
+            #                     ap_metric:sum(ap_list)/len(ap_list),"x":epoch},commit=False)
             graph_id_global += len(ap_list)
 
-            if args.wandb:
-                wandb.log()
+            # if args.wandb:
+            #     wandb.log()
 
         if args.comet:
             if len(train_inner_avg_ap_list) > 0:
@@ -417,6 +417,9 @@ def main(args):
         val_loss = validation(args,meta_model_copy,optimizer_copy,val_loader,epoch)
         print(f'The average validation loss in Epoch {epoch} is ---- {val_loss}')
         test(args,meta_model_copy,optimizer_copy,test_loader,epoch,inner_steps=args.inner_steps)
+
+        if args.wandb:
+            wandb.log({f"Avg_Validation_set /epoch":val_loss.item(), 'epoch':epoch})
 
         'Early stopping check after each epoch, check if the val loss is decresed. ' \
         'If it has it, make a checkpoint of current model'
@@ -582,7 +585,7 @@ if __name__ == '__main__':
 
     args.dev = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     if args.dataset=='PPI':
-        project_name = 'track-mata-graph'
+        project_name = 'VGAE-track-mata-graph'
     elif args.dataset=='REDDIT-MULTI-12K':
         project_name = "meta-graph-reddit"
     elif args.dataset=='FIRSTMM_DB':

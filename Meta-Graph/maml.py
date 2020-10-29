@@ -123,15 +123,20 @@ def meta_gradient_step(model,
                         allow_unused=args.allow_unused, create_graph=create_graph)
                 gradients = [0 if grad is None else grad  for grad in gradients]
                 if args.wandb:
-                    wandb.log({"Inner_Train_loss":loss.item()})
+                    if args.model in ['VGAE']:
+                         wandb.log({f"Inner_Train_Total-loss of {mode} Graph {graph_id}":loss.item()})
+                         wandb.log({f"Inner_Train_Recon-loss of {mode} Graph {graph_id}": (loss.item()-kl_loss.item())})
+                         wandb.log({f"Inner_Train_Kl-loss of {mode} Graph {graph_id}": kl_loss.item()})
+                    else:
+                        wandb.log({f"Inner_Train_loss of {mode} Graph {graph_id}": loss.item()})
 
                 if args.clip_grad:
                     # for grad in gradients:
                     custom_clip_grad_norm_(gradients,args.clip)
                     grad_norm = monitor_grad_norm_2(gradients)
-                    if args.wandb:
-                        inner_grad_norm_metric = 'Inner_Grad_Norm'
-                        wandb.log({inner_grad_norm_metric:grad_norm})
+                    # if args.wandb:
+                        # inner_grad_norm_metric = 'Inner_Grad_Norm'
+                        # wandb.log({inner_grad_norm_metric:grad_norm})
 
             ''' Only do this if its the final test set eval '''
             if args.final_test and inner_batch % 5 ==0:
@@ -176,7 +181,14 @@ def meta_gradient_step(model,
                 loss_val = loss_val + kl_loss
 
         if args.wandb:
-            wandb.log({"Inner_Val_loss":loss_val.item()})
+
+            if args.model in ['VGAE']:
+                wandb.log({f"Inner_Val_Total-loss of {mode} Graph {graph_id}":loss_val.item()})
+                wandb.log({f"Inner_Val_Recon-loss of {mode} Graph {graph_id}":(loss_val.item()-kl_loss.item())})
+                wandb.log({f"Inner_Val_Kl-loss of {mode} Graph {graph_id}":kl_loss.item()})
+            else:
+                wandb.log({f"Inner_Val_loss of {mode} Graph {graph_id}":loss_val.item()})
+
             # print("Inner Val Loss %f" % (loss_val.item()))
 
         ##TODO: Is this backward call needed here? Not sure because original repo has it
@@ -213,14 +225,14 @@ def meta_gradient_step(model,
             args.experiment.log_metric(ap_metric,sum(ap_list)/len(ap_list),step=epoch)
             args.experiment.log_metric(avg_auc_metric,sum(auc_list)/len(auc_list),step=epoch)
             args.experiment.log_metric(avg_ap_metric,sum(ap_list)/len(ap_list),step=epoch)
-    if args.wandb:
-        if len(ap_list) > 0:
-            auc_metric = mode + '_Local_Batch_Graph_' + str(batch_id) + '_AUC'
-            ap_metric = mode + '_Local_Batch_Graph_' + str(batch_id) + '_AP'
-            avg_auc_metric = mode + '_Inner_Batch_Graph' + '_AUC'
-            avg_ap_metric = mode + '_Inner_Batch_Graph' + '_AP'
-            wandb.log({auc_metric:sum(auc_list)/len(auc_list),ap_metric:sum(ap_list)/len(ap_list),\
-                    avg_auc_metric:sum(auc_list)/len(auc_list),avg_ap_metric:sum(ap_list)/len(ap_list)})
+    # if args.wandb:
+    #     if len(ap_list) > 0:
+    #         auc_metric = mode + '_Local_Batch_Graph_' + str(batch_id) + '_AUC'
+    #         ap_metric = mode + '_Local_Batch_Graph_' + str(batch_id) + '_AP'
+    #         avg_auc_metric = mode + '_Inner_Batch_Graph' + '_AUC'
+    #         avg_ap_metric = mode + '_Inner_Batch_Graph' + '_AP'
+    #         wandb.log({auc_metric:sum(auc_list)/len(auc_list),ap_metric:sum(ap_list)/len(ap_list),\
+    #                 avg_auc_metric:sum(auc_list)/len(auc_list),avg_ap_metric:sum(ap_list)/len(ap_list)})
 
     meta_batch_loss = torch.Tensor([0])
     if order == 1:
