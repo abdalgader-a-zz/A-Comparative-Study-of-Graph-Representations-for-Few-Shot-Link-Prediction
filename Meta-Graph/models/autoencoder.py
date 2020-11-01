@@ -8,7 +8,7 @@ from torch_geometric.utils import to_undirected
 
 # from ..inits import reset
 
-EPS = 1e-15
+EPS = 1e-5
 LOG_VAR_MAX = 10
 LOG_VAR_MIN = EPS
 
