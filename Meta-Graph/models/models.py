@@ -76,25 +76,25 @@ class DGCNN(torch.nn.Module):
 
         self.LReLU = nn.LeakyReLU(negative_slope=0.2)
 
-        self.conv1 = DGConv2d(120, 64, kernel_size=1, bias=False)
+        self.conv1 = DGConv2d(120, 64, kernel_size=1, bias=True)
         self.bn1 = nn.BatchNorm2d(64)
 
 
-        self.conv2 = DGConv2d(64 * 2, 64, kernel_size=1, bias=False)
+        self.conv2 = DGConv2d(64 * 2, 64, kernel_size=1, bias=True)
         self.bn2 = nn.BatchNorm2d(64)
 
-        self.conv3 = DGConv2d(64 * 2, 128, kernel_size=1, bias=False)
+        self.conv3 = DGConv2d(64 * 2, 128, kernel_size=1, bias=True)
         self.bn3 = nn.BatchNorm2d(128)
 
-        self.conv4 = DGConv2d(128 * 2, 256, kernel_size=1, bias=False)
+        self.conv4 = DGConv2d(128 * 2, 256, kernel_size=1, bias=True)
         self.bn4 = nn.BatchNorm2d(256)
 
 
-        self.conv5 = DGConv1d(512, 256, kernel_size=1, bias=False)
+        self.conv5 = DGConv1d(512, 256, kernel_size=1, bias=True)
         self.bn5 = nn.BatchNorm1d(256)
 
 
-        self.conv6 = DGConv1d(256, args.emb_dims, kernel_size=1, bias=False)
+        self.conv6 = DGConv1d(256, args.emb_dims, kernel_size=1, bias=True)
         self.bn6 = nn.BatchNorm1d(args.emb_dims)
 
 
@@ -104,25 +104,25 @@ class DGCNN(torch.nn.Module):
 
         batch_size = x.size(0)
         x = get_graph_feature(x, k=self.k)
-        x = self.LReLU(self.bn1(self.conv1(x, weights['encoder.conv1.weight'])))
+        x = self.LReLU(self.bn1(self.conv1(x, weights['encoder.conv1.weight'], weights['encoder.conv1.bias'])))
         x1 = x.max(dim=-1, keepdim=False)[0]
 
         x = get_graph_feature(x1, k=self.k)
-        x = self.LReLU(self.bn2(self.conv2(x, weights['encoder.conv2.weight'])))
+        x = self.LReLU(self.bn2(self.conv2(x, weights['encoder.conv2.weight'], weights['encoder.conv2.bias'])))
         x2 = x.max(dim=-1, keepdim=False)[0]
 
         x = get_graph_feature(x2, k=self.k)
-        x = self.LReLU(self.bn3(self.conv3(x, weights['encoder.conv3.weight'])))
+        x = self.LReLU(self.bn3(self.conv3(x, weights['encoder.conv3.weight'],weights['encoder.conv3.bias'])))
         x3 = x.max(dim=-1, keepdim=False)[0]
 
         x = get_graph_feature(x3, k=self.k)
-        x = self.LReLU(self.bn4(self.conv4(x, weights['encoder.conv4.weight'])))
+        x = self.LReLU(self.bn4(self.conv4(x, weights['encoder.conv4.weight'], weights['encoder.conv4.bias'])))
         x4 = x.max(dim=-1, keepdim=False)[0]
 
         x = torch.cat((x1, x2, x3, x4), dim=1)
 
-        x = self.LReLU(self.bn5(self.conv5(x, weights['encoder.conv5.weight'])))
-        x = self.LReLU(self.bn6(self.conv6(x, weights['encoder.conv6.weight'])))
+        x = self.LReLU(self.bn5(self.conv5(x, weights['encoder.conv5.weight'], weights['encoder.conv5.bias'])))
+        x = self.LReLU(self.bn6(self.conv6(x, weights['encoder.conv6.weight'], weights['encoder.conv6.bias'])))
 
         x = x.permute(0, 2, 1)
 

@@ -597,13 +597,13 @@ class DGConv1d(_DGConvNd):
             in_channels, out_channels, kernel_size, stride, padding, dilation,
             False, _single(0), groups, bias, padding_mode)
 
-    def forward(self, input, weight):
+    def forward(self, input, weight, bias):
         if self.padding_mode == 'circular':
             expanded_padding = ((self.padding[0] + 1) // 2, self.padding[0] // 2)
             return F.conv1d(F.pad(input, expanded_padding, mode='circular'),
-                            weight, self.bias, self.stride,
+                            weight, bias, self.stride,
                             _single(0), self.dilation, self.groups)
-        return F.conv1d(input, weight, self.bias, self.stride,
+        return F.conv1d(input, weight, bias, self.stride,
                         self.padding, self.dilation, self.groups)
 
 
@@ -619,15 +619,15 @@ class DGConv2d(_DGConvNd):
             in_channels, out_channels, kernel_size, stride, padding, dilation,
             False, _pair(0), groups, bias, padding_mode)
 
-    def conv2d_forward(self, input, weight):
+    def conv2d_forward(self, input, weight, bias):
         if self.padding_mode == 'circular':
             expanded_padding = ((self.padding[1] + 1) // 2, self.padding[1] // 2,
                                 (self.padding[0] + 1) // 2, self.padding[0] // 2)
             return F.conv2d(F.pad(input, expanded_padding, mode='circular'),
-                            weight, self.bias, self.stride,
+                            weight, bias, self.stride,
                             _pair(0), self.dilation, self.groups)
-        return F.conv2d(input, weight, self.bias, self.stride,
+        return F.conv2d(input, weight, bias, self.stride,
                         self.padding, self.dilation, self.groups)
 
-    def forward(self, input, weight):
-        return self.conv2d_forward(input, weight)
+    def forward(self, input, weight, bias):
+        return self.conv2d_forward(input, weight, bias)
