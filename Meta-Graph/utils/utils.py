@@ -114,10 +114,10 @@ def uniform(size, tensor):
     if tensor is not None:
         tensor.data.uniform_(-bound, bound)
 
-def test(model, x, train_pos_edge_index, only_gae, pos_edge_index, neg_edge_index,weights):
+def test(args, model, x, train_pos_edge_index, only_gae, pos_edge_index, neg_edge_index,weights):
     model.eval()
     with torch.no_grad():
-        z = model.encode(x, train_pos_edge_index, weights, only_gae=only_gae)
+        z = model.encode(x, train_pos_edge_index, weights, only_gae=only_gae, no_sig=args.no_sig)
     return model.test(z, pos_edge_index, neg_edge_index)
 
 def global_test(args, model, data_batch, weights):
@@ -156,7 +156,7 @@ def global_test(args, model, data_batch, weights):
             continue
 
         with torch.no_grad():
-            z = model.encode(x, train_pos_edge_index,weights, only_gae=args.apply_gae_only)
+            z = model.encode(x, train_pos_edge_index,weights, only_gae=args.apply_gae_only, no_sig=args.no_sig)
         auc, ap = model.test(z, pos_edge_index, neg_edge_index)
         auc_list.append(auc)
         ap_list.append(ap)
@@ -199,7 +199,7 @@ def global_val_test(args, model, data_batch, weights):
             continue
 
         with torch.no_grad():
-            z = model.encode(x, train_pos_edge_index,weights, only_gae=args.apply_gae_only)
+            z = model.encode(x, train_pos_edge_index,weights, only_gae=args.apply_gae_only, no_sig=args.no_sig)
 
         val_loss = model.recon_loss(z, train_pos_edge_index)
         auc, ap = model.test(z, pos_edge_index, neg_edge_index)
@@ -469,7 +469,7 @@ def subsample_edges(G, num_edges):
 def val(model, args, x, only_gae, val_pos_edge_index, num_nodes, weights):
     model.eval()
     with torch.no_grad():
-        z = model.encode(x, val_pos_edge_index, weights, only_gae=only_gae)
+        z = model.encode(x, val_pos_edge_index, weights, only_gae=only_gae, no_sig=args.no_sig)
         loss = model.recon_loss(z, val_pos_edge_index)
         if args.model in ['VGAE']:
             loss = loss + (1 / num_nodes) * model.kl_loss()
@@ -702,7 +702,7 @@ def compute_sig_graph_sim(args, model, dataloader):
                 data.test_neg_edge_index.to(args.dev)
         with torch.no_grad():
             z = model.encode(x, train_pos_edge_index, \
-                    OrderedDict(model.named_parameters()), inner_loop=True)
+                    OrderedDict(model.named_parameters()), inner_loop=True, no_sig=args.no_sig)
         sig_out = model.encoder.cache_sig_out
         flattened_params = torch.cat(sig_out)
         norm = flattened_params.norm(p=2, dim=0, keepdim=True)

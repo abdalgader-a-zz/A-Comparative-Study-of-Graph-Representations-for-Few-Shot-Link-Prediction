@@ -32,7 +32,8 @@ def meta_gradient_step(model,
                        batch_id,
                        train,
                        inner_test_auc_array=None,
-                       inner_test_ap_array=None):
+                       inner_test_ap_array=None,
+                       transfer_learning_weights = None):
     """
     Perform a gradient step on a meta-learner.
     # Arguments
@@ -105,13 +106,17 @@ def meta_gradient_step(model,
         create_graph = (True if order == 2 else False) and train
 
         # Create a fast model using the current meta model weights
-        fast_weights = OrderedDict(model.named_parameters())
+        if transfer_learning_weights is not None and args.no_meta_update:
+            fast_weights = transfer_learning_weights
+
+        else:
+            fast_weights = OrderedDict(model.named_parameters())
         early_stopping = EarlyStopping(patience=args.patience, verbose=False)
 
         # Train the model for `inner_train_steps` iterations
         for inner_batch in range(inner_train_steps):
             # Perform update of model weights
-            z = model.encode(x, train_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=True, train=train)
+            z = model.encode(x, train_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=True, train=train, no_sig=args.no_sig)
             loss = model.recon_loss(z, train_pos_edge_index)
             if args.model in ['VGAE']:
                 if not args.apply_gae_only:
@@ -141,7 +146,7 @@ def meta_gradient_step(model,
             ''' Only do this if its the final test set eval '''
             if args.final_test and inner_batch % 5 ==0:
 
-                inner_test_auc, inner_test_ap = test(model, x, train_pos_edge_index, args.apply_gae_only,
+                inner_test_auc, inner_test_ap = test(args, model, x, train_pos_edge_index, args.apply_gae_only,
                         data.test_pos_edge_index, data.test_neg_edge_index,fast_weights)
                 val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
                 val_loss = val(model,args, x, args.apply_gae_only,val_pos_edge_index,data.num_nodes,fast_weights)
@@ -172,7 +177,7 @@ def meta_gradient_step(model,
 
         # Do a pass of the model on the validation data from the current task
         val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
-        z_val = model.encode(x, val_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=False, train=train)
+        z_val = model.encode(x, val_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=False, train=train, no_sig=args.no_sig)
         loss_val = model.recon_loss(z_val, val_pos_edge_index)
         if args.model in ['VGAE']:
             if not args.apply_gae_only:
@@ -197,7 +202,7 @@ def meta_gradient_step(model,
             loss_val.backward(retain_graph=True)
 
         # Get post-update accuracies
-        auc, ap = test(model, x, train_pos_edge_index, args.apply_gae_only,
+        auc, ap = test(args, model, x, train_pos_edge_index, args.apply_gae_only,
                 data.test_pos_edge_index, data.test_neg_edge_index,fast_weights)
 
         auc_list.append(auc)
@@ -213,8 +218,13 @@ def meta_gradient_step(model,
             named_grads = {name: g for ((name, _), g) in zip(fast_weights.items(), gradients)}
             task_gradients.append(named_grads)
 
-    if len(auc_list) > 0 and len(ap_list) > 0 and batch_id % 5 == 0:
+    if args.no_meta_update:
+        print('Inner Graph Batch: {:01d}, Inner-Update AUC: {:.4f}, AP: {:.4f}'.format(batch_id, sum(auc_list) / len(auc_list), sum(ap_list) / len(ap_list)))
+
+
+    if len(auc_list) > 0 and len(ap_list) > 0 and batch_id % 5 == 0 and not args.no_meta_update:
         print('Epoch {:01d} Inner Graph Batch: {:01d}, Inner-Update AUC: {:.4f}, AP: {:.4f}'.format(epoch,batch_id,sum(auc_list)/len(auc_list),sum(ap_list)/len(ap_list)))
+
     if args.comet:
         if len(ap_list) > 0:
             auc_metric = mode + '_Local_Batch_Graph_' + str(batch_id) + '_AUC'
@@ -251,7 +261,7 @@ def meta_gradient_step(model,
             # Replace dummy gradients with mean task gradients using hooks
             ## TODO: Double check if you really need functional forward here
             z_dummy = model.encode(torch.zeros(x.shape[0],x.shape[1]).float().cuda(), \
-                    torch.zeros(train_pos_edge_index.shape[0],train_pos_edge_index.shape[1]).long().cuda(), fast_weights, train=train)
+                    torch.zeros(train_pos_edge_index.shape[0],train_pos_edge_index.shape[1]).long().cuda(), fast_weights, train=train, no_sig=args.no_sig)
             loss = model.recon_loss(z_dummy,torch.zeros(train_pos_edge_index.shape[0],\
                     train_pos_edge_index.shape[1]).long().cuda())
             loss.backward()
@@ -268,19 +278,22 @@ def meta_gradient_step(model,
             optimiser.zero_grad()
             meta_batch_loss = torch.stack(task_losses).mean()
 
-            if train:
-                meta_batch_loss.backward()
-                if args.clip_grad:
-                    torch.nn.utils.clip_grad_norm_(model.parameters(),args.clip)
-                    grad_norm = monitor_grad_norm(model)
-                    if args.wandb:
-                        outer_grad_norm_metric = 'Outer_Grad_Norm'
-                        wandb.log({outer_grad_norm_metric:grad_norm})
+            if not args.no_meta_update:
+                if train:
+                    meta_batch_loss.backward()
+                    if args.clip_grad:
+                        torch.nn.utils.clip_grad_norm_(model.parameters(),args.clip)
+                        grad_norm = monitor_grad_norm(model)
+                        if args.wandb:
+                            outer_grad_norm_metric = 'Outer_Grad_Norm'
+                            wandb.log({outer_grad_norm_metric:grad_norm})
 
-                optimiser.step()
-                if args.clip_weight:
-                    for p in model.parameters():
-                        p.data.clamp_(-args.clip_weight_val,args.clip_weight_val)
-        return graph_id, meta_batch_loss, inner_avg_auc_list, inner_avg_ap_list
+                    optimiser.step()
+                    if args.clip_weight:
+                        for p in model.parameters():
+                            p.data.clamp_(-args.clip_weight_val,args.clip_weight_val)
+
+
+        return graph_id, meta_batch_loss, inner_avg_auc_list, inner_avg_ap_list, fast_weights
     else:
         raise ValueError('Order must be either 1 or 2.')

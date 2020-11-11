@@ -138,7 +138,7 @@ class MetaSignatureEncoder(torch.nn.Module):
                 self.edge_drop = EdgeDrop(keep_prob=args.keep_prob, mode=DropMode.WEIGHTED, plot=False)
 
 
-    def forward(self, x, edge_index, weights, only_gae=False,  inner_loop=True, train=False):
+    def forward(self, x, edge_index, weights, only_gae=False,  inner_loop=True, train=False, no_sig=False):
         if self.args.drop_edges and train:
             edge_index = self.edge_drop(edge_index)
         keys = list(weights.keys())
@@ -150,6 +150,10 @@ class MetaSignatureEncoder(torch.nn.Module):
         else:
             sig_gamma_1, sig_beta_1, sig_gamma_2, sig_beta_2 = self.signature(x, edge_index, weights, sig_keys)
             self.cache_sig_out = [sig_gamma_1,sig_beta_1,sig_gamma_2,sig_beta_2]
+
+        if no_sig:
+            sig_gamma_1, sig_gamma_2, sig_beta_1, sig_beta_2 = None, None, None, None
+
 
         x = F.relu(self.conv1(x, edge_index, weights['encoder.conv1.weight'],\
                 weights['encoder.conv1.bias'], gamma=sig_gamma_1, beta=sig_beta_1)) # put gamma=sig_gamma_1, beta=sig_beta_1 if use sig
