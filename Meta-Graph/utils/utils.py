@@ -117,7 +117,11 @@ def uniform(size, tensor):
 def test(args, model, x, train_pos_edge_index, only_gae, pos_edge_index, neg_edge_index,weights):
     model.eval()
     with torch.no_grad():
-        z = model.encode(x, train_pos_edge_index, weights, only_gae=only_gae, no_sig=args.no_sig)
+        if model.encoder.args.encoder == 'DGCNN':
+            z = model.encode(x, weights)
+            z = z.squeeze(0)
+        else:
+            z = model.encode(x, train_pos_edge_index, weights, only_gae=only_gae, no_sig=args.no_sig)
     return model.test(z, pos_edge_index, neg_edge_index)
 
 def global_test(args, model, data_batch, weights):
@@ -156,7 +160,12 @@ def global_test(args, model, data_batch, weights):
             continue
 
         with torch.no_grad():
-            z = model.encode(x, train_pos_edge_index,weights, only_gae=args.apply_gae_only, no_sig=args.no_sig)
+            if args.encoder == 'DGCNN':
+                x = x.unsqueeze(0).permute(0, 2, 1)
+                z = model.encode(x, weights)
+                z = z.squeeze(0)
+            else:
+                z = model.encode(x, train_pos_edge_index, weights, only_gae=args.apply_gae_only, no_sig=args.no_sig)
         auc, ap = model.test(z, pos_edge_index, neg_edge_index)
         auc_list.append(auc)
         ap_list.append(ap)
@@ -469,7 +478,11 @@ def subsample_edges(G, num_edges):
 def val(model, args, x, only_gae, val_pos_edge_index, num_nodes, weights):
     model.eval()
     with torch.no_grad():
-        z = model.encode(x, val_pos_edge_index, weights, only_gae=only_gae, no_sig=args.no_sig)
+        if args.encoder == 'DGCNN':
+            z = model.encode(x, weights)
+            z = z.squeeze(0)
+        else:
+            z = model.encode(x, val_pos_edge_index, weights, only_gae=only_gae, no_sig=args.no_sig)
         loss = model.recon_loss(z, val_pos_edge_index)
         if args.model in ['VGAE']:
             loss = loss + (1 / num_nodes) * model.kl_loss()

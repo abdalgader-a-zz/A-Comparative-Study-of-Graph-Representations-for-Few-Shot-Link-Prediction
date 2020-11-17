@@ -312,12 +312,16 @@ def main(args):
     kwargs = {'GAE': MyGAE, 'VGAE': MyVGAE}
     kwargs_enc = {'GCN': MetaEncoder, 'FC': MLPEncoder, 'MLP': MetaMLPEncoder,
                   'GraphSignature': MetaSignatureEncoder,
-                  'GatedGraphSignature': MetaGatedSignatureEncoder}
+                   'GatedGraphSignature': MetaGatedSignatureEncoder, 'DGCNN':DGCNN}
 
     path = osp.join(
         osp.dirname(osp.realpath(__file__)), '..', 'data', args.dataset)
     train_loader, val_loader, test_loader = load_dataset(args.dataset,args)
-    meta_model = kwargs[args.model](kwargs_enc[args.encoder](args, args.num_features, args.num_channels)).to(args.dev)
+
+    if args.encoder == 'DGCNN':
+        meta_model = kwargs[args.model](kwargs_enc[args.encoder](args, args.dev)).to(args.dev)
+    else:
+        meta_model = kwargs[args.model](kwargs_enc[args.encoder](args, args.num_features, args.num_channels)).to(args.dev)
     if args.train_only_gs:
         trainable_parameters = []
         for name, p in meta_model.named_parameters():
@@ -333,7 +337,7 @@ def main(args):
     if not args.do_kl_anneal:
         args.kl_anneal = 1
 
-    if args.encoder == 'GraphSignature' or args.encoder == 'GatedGraphSignature':
+    if args.encoder == 'GraphSignature' or args.encoder == 'GatedGraphSignature' or args.encoder == 'DGCNN':
         args.allow_unused = True
     else:
         args.allow_unused = False
@@ -383,7 +387,7 @@ def main(args):
                     dot.render(args.debug_name)
                     quit()
 
-                graph_id_local, meta_loss, train_inner_avg_auc_list, train_inner_avg_ap_list = meta_gradient_step(meta_model,\
+                graph_id_local, meta_loss, train_inner_avg_auc_list, train_inner_avg_ap_list, transfer_learning_weights = meta_gradient_step(meta_model,\
                         args,data,optimizer,args.inner_steps,args.inner_lr,args.order,graph_id_local,\
                         mode,train_inner_avg_auc_list, train_inner_avg_ap_list,epoch,i,True, transfer_learning_weights=transfer_learning_weights)
                 if args.do_kl_anneal:
@@ -440,7 +444,10 @@ def main(args):
 
             if not args.no_meta_update:
                 ''' Meta-Testing After every Epoch'''
-                meta_model_copy = kwargs[args.model](kwargs_enc[args.encoder](args, args.num_features, args.num_channels)).to(args.dev)
+                if args.encoder == 'DGCNN':
+                    meta_model_copy = kwargs[args.model](kwargs_enc[args.encoder](args, args.dev)).to(args.dev)
+                else:
+                    meta_model_copy = kwargs[args.model](kwargs_enc[args.encoder](args, args.num_features, args.num_channels)).to(args.dev)
                 meta_model_copy.load_state_dict(meta_model.state_dict())
                 if args.train_only_gs:
                     optimizer_copy = torch.optim.Adam(trainable_parameters, lr=args.meta_lr)
@@ -638,10 +645,14 @@ if __name__ == '__main__':
     parser.add_argument('--gating', type=str, default=None, choices=[None, 'signature', 'weights', 'signature_cond', 'weights_cond'])
     parser.add_argument('--layer_norm', default=False, action='store_true',
                         help='use layer norm')
+
     parser.add_argument('--apply_gae_only',  default= False, action='store_true', help='apply simple GAE')
     parser.add_argument('--drop_edges', default=False, action='store_true', help='drop edges')
     parser.add_argument('--keep_prob', type=float, default= .5, help='edges keep probability')
     parser.add_argument('--drop_mode', type=str, default='equal', choices=['equal', 'weighted'], help='edges drop mode')
+
+    parser.add_argument('--k', type=int, default=5, metavar='N', help='Num of nearest neighbors to use')
+    parser.add_argument('--emb_dims', type=int, default=16, metavar='N', help='Dimension of embeddings')
 
     parser.add_argument('--pre_train', default=False, action='store_true', help='use meta-update setup')
     parser.add_argument('--no_meta_update', default=False, action='store_true', help='use meta-update setup')

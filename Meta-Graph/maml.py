@@ -116,9 +116,15 @@ def meta_gradient_step(model,
 
         start_time = time.time()
         # Train the model for `inner_train_steps` iterations
+        if args.encoder == 'DGCNN':
+            x = x.unsqueeze(0).permute(0, 2, 1)
         for inner_batch in range(inner_train_steps):
             # Perform update of model weights
-            z = model.encode(x, train_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=True, train=train, no_sig=args.no_sig)
+            if args.encoder == 'DGCNN':
+                z = model.encode(x, fast_weights)
+                z = z.squeeze(0)
+            else:
+                z = model.encode(x, train_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=True, train=train, no_sig=args.no_sig)
             loss = model.recon_loss(z, train_pos_edge_index)
             if args.model in ['VGAE']:
                 if not args.apply_gae_only:
@@ -180,7 +186,13 @@ def meta_gradient_step(model,
 
         # Do a pass of the model on the validation data from the current task
         val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
-        z_val = model.encode(x, val_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=False, train=train, no_sig=args.no_sig)
+
+        if args.encoder == 'DGCNN':
+            z_val = model.encode(x, fast_weights)
+            z_val = z_val.squeeze(0)
+        else:
+            z_val = model.encode(x, val_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=False, train=train, no_sig=args.no_sig)
+
         loss_val = model.recon_loss(z_val, val_pos_edge_index)
         if args.model in ['VGAE']:
             if not args.apply_gae_only:
@@ -303,6 +315,6 @@ def meta_gradient_step(model,
         # del gradients, model, loss, z_val, optimiser, z, x, val_pos_edge_index, data, data_batch, data_graph
         # torch.cuda.empty_cache()
         # memories_info('gpu')
-        return graph_id, meta_batch_loss, inner_avg_auc_list, inner_avg_ap_list
+        return graph_id, meta_batch_loss, inner_avg_auc_list, inner_avg_ap_list, fast_weights
     else:
         raise ValueError('Order must be either 1 or 2.')
