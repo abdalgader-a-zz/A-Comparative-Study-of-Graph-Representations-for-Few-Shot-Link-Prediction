@@ -115,7 +115,7 @@ def test(args,meta_model,optimizer,test_loader,train_epoch,return_val=False,inne
             continue
 
         if not args.random_baseline and not args.adamic_adar_baseline:
-            test_graph_id_local, meta_loss, test_inner_avg_auc_list, test_inner_avg_ap_list = meta_gradient_step(meta_model,\
+            test_graph_id_local, meta_loss, test_inner_avg_auc_list, test_inner_avg_ap_list, transfer_learning_weights = meta_gradient_step(meta_model,\
                     args,data,optimizer,args.inner_steps,args.inner_lr,args.order,test_graph_id_local,mode,\
                     test_inner_avg_auc_list, test_inner_avg_ap_list,train_epoch,j,False,\
                             inner_test_auc_array,inner_test_ap_array, transfer_learning_weights)
