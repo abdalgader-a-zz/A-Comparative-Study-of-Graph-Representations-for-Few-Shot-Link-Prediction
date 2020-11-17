@@ -16,13 +16,14 @@ from maml import meta_gradient_step
 from models.models import *
 from utils.utils import global_test, global_val_test, test, EarlyStopping, seed_everything,\
         filter_state_dict, create_nx_graph, calc_adamic_adar_score,\
-        create_nx_graph_deepwalk, train_deepwalk_model,calc_deepwalk_score
+        create_nx_graph_deepwalk, train_deepwalk_model,calc_deepwalk_score, memories_info
 from utils.utils import run_analysis
 from collections import OrderedDict
 from torchviz import make_dot
 import numpy as np
 import wandb
 import ipdb
+import time
 
 def test(args,meta_model,optimizer,test_loader,train_epoch,return_val=False,inner_steps=10,seed= 0, transfer_learning_weights=None):
     ''' Meta-Testing '''
@@ -114,7 +115,7 @@ def test(args,meta_model,optimizer,test_loader,train_epoch,return_val=False,inne
             continue
 
         if not args.random_baseline and not args.adamic_adar_baseline:
-            test_graph_id_local, meta_loss, test_inner_avg_auc_list, test_inner_avg_ap_list, transfer_learning_weights = meta_gradient_step(meta_model,\
+            test_graph_id_local, meta_loss, test_inner_avg_auc_list, test_inner_avg_ap_list = meta_gradient_step(meta_model,\
                     args,data,optimizer,args.inner_steps,args.inner_lr,args.order,test_graph_id_local,mode,\
                     test_inner_avg_auc_list, test_inner_avg_ap_list,train_epoch,j,False,\
                             inner_test_auc_array,inner_test_ap_array, transfer_learning_weights)
@@ -223,7 +224,7 @@ def validation(args,meta_model,optimizer,val_loader,train_epoch,return_val=False
         inner_val_ap_array = np.zeros((len(val_loader)*args.val_batch_size, int(1000/5)))
     for j,data in enumerate(val_loader):
         if not args.random_baseline:
-            val_graph_id_local, meta_loss, val_inner_avg_auc_list, val_inner_avg_ap_list, transfer_learning_weights = meta_gradient_step(meta_model,\
+            val_graph_id_local, meta_loss, val_inner_avg_auc_list, val_inner_avg_ap_list = meta_gradient_step(meta_model,\
                     args,data,optimizer,args.inner_steps,args.inner_lr,args.order,val_graph_id_local,mode,\
                     val_inner_avg_auc_list,val_inner_avg_ap_list,train_epoch,j,False,\
                             inner_val_auc_array,inner_val_ap_array, transfer_learning_weights)
@@ -364,6 +365,8 @@ def main(args):
             args.inner_steps = args.no_meta_inner_steps
 
         transfer_learning_weights = None
+
+        start_time = time.time()
         for epoch in range(0,args.epochs):
             graph_id_local = 0
             graph_id_global = 0
@@ -380,7 +383,7 @@ def main(args):
                     dot.render(args.debug_name)
                     quit()
 
-                graph_id_local, meta_loss, train_inner_avg_auc_list, train_inner_avg_ap_list, transfer_learning_weights = meta_gradient_step(meta_model,\
+                graph_id_local, meta_loss, train_inner_avg_auc_list, train_inner_avg_ap_list = meta_gradient_step(meta_model,\
                         args,data,optimizer,args.inner_steps,args.inner_lr,args.order,graph_id_local,\
                         mode,train_inner_avg_auc_list, train_inner_avg_ap_list,epoch,i,True, transfer_learning_weights=transfer_learning_weights)
                 if args.do_kl_anneal:
@@ -406,6 +409,9 @@ def main(args):
                 #             wandb.log({auc_metric:sum(auc_list)/len(auc_list),\
                 #                     ap_metric:sum(ap_list)/len(ap_list),"x":epoch},commit=False)
                 graph_id_global += len(ap_list)
+                # print("Empty cash ...................")
+                # torch.cuda.empty_cache()
+                # memories_info('gpu')
 
                 # if args.wandb:
                 #     wandb.log()
@@ -427,6 +433,10 @@ def main(args):
             if len(train_inner_avg_ap_list) > 0:
                 print('Train Inner AUC: {:.4f}, AP: {:.4f}'.format(sum(train_inner_avg_auc_list)/len(train_inner_avg_auc_list),\
                                 sum(train_inner_avg_ap_list)/len(train_inner_avg_ap_list)))
+
+            # print("Empty cash ...................")
+            # torch.cuda.empty_cache()
+            # memories_info('gpu')
 
             if not args.no_meta_update:
                 ''' Meta-Testing After every Epoch'''
@@ -455,7 +465,7 @@ def main(args):
                 #     break
 
         print("Note: Failed on %d Training graphs" % (args.fail_counter))
-        print(40*'#', 'End Training', 40*'#')
+        print('{} End Training. it took {:.4f} minutes {}'.format(40 * '#', (time.time() - start_time) / 60, 40 * '#'))
 
 
 

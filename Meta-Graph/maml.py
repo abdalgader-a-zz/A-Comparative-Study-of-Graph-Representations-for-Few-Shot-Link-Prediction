@@ -4,11 +4,12 @@ from collections import OrderedDict
 from torch.optim import Optimizer
 from torch.nn import Module
 from typing import Dict, List, Callable, Union
-from utils.utils import custom_clip_grad_norm_, val, test, EarlyStopping, monitor_grad_norm, monitor_grad_norm_2, monitor_weight_norm
+from utils.utils import custom_clip_grad_norm_, val, test, EarlyStopping, monitor_grad_norm, monitor_grad_norm_2, monitor_weight_norm,  memories_info
 from torchviz import make_dot
 import ipdb
 import wandb
 from copy import deepcopy
+import time
 
 def replace_grad(parameter_gradients, parameter_name):
     def replace_grad_(module):
@@ -113,6 +114,7 @@ def meta_gradient_step(model,
             fast_weights = OrderedDict(model.named_parameters())
         early_stopping = EarlyStopping(patience=args.patience, verbose=False)
 
+        start_time = time.time()
         # Train the model for `inner_train_steps` iterations
         for inner_batch in range(inner_train_steps):
             # Perform update of model weights
@@ -175,6 +177,7 @@ def meta_gradient_step(model,
                 inner_test_ap_array[graph_id][my_step:,] = inner_test_ap
                 break
 
+
         # Do a pass of the model on the validation data from the current task
         val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
         z_val = model.encode(x, val_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=False, train=train, no_sig=args.no_sig)
@@ -218,8 +221,9 @@ def meta_gradient_step(model,
             named_grads = {name: g for ((name, _), g) in zip(fast_weights.items(), gradients)}
             task_gradients.append(named_grads)
 
+
     if args.no_meta_update:
-        print('Inner Graph Batch: {:01d}, Inner-Update AUC: {:.4f}, AP: {:.4f}'.format(batch_id, sum(auc_list) / len(auc_list), sum(ap_list) / len(ap_list)))
+        print('Inner Graph Batch: {:01d}, Inner-Update AUC: {:.4f}, AP: {:.4f} --- ({:.4f} minutes)'.format(batch_id, sum(auc_list) / len(auc_list), sum(ap_list) / len(ap_list), (time.time()-start_time)/60))
 
 
     if len(auc_list) > 0 and len(ap_list) > 0 and batch_id % 5 == 0 and not args.no_meta_update:
@@ -293,7 +297,12 @@ def meta_gradient_step(model,
                         for p in model.parameters():
                             p.data.clamp_(-args.clip_weight_val,args.clip_weight_val)
 
-
-        return graph_id, meta_batch_loss, inner_avg_auc_list, inner_avg_ap_list, fast_weights
+        # memories_info('gpu')
+        #
+        # # free memory after do inner steps on a graph
+        # del gradients, model, loss, z_val, optimiser, z, x, val_pos_edge_index, data, data_batch, data_graph
+        # torch.cuda.empty_cache()
+        # memories_info('gpu')
+        return graph_id, meta_batch_loss, inner_avg_auc_list, inner_avg_ap_list
     else:
         raise ValueError('Order must be either 1 or 2.')

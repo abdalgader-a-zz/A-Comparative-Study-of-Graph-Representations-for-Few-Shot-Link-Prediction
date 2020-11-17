@@ -757,3 +757,41 @@ def run_wl_kernel(args, dataloader, model, edge_ratio):
     kernel_mat = wl_kernel.fit_transform(pos_graph_list)
     neg_kernel_mat = wl_kernel.transform(neg_graph_list)
     return kernel_mat, neg_kernel_mat
+
+
+def memories_info(type='cpu'):
+
+    if type == 'cpu':
+        import psutil
+
+        # gives a single float value
+        psutil.cpu_percent()
+        # gives an object with many fields
+        psutil.virtual_memory()
+        # you can convert that object to a dictionary
+        dict(psutil.virtual_memory()._asdict())
+
+        total = (psutil.virtual_memory().total / (1024 ** 3))
+        used = psutil.virtual_memory().used / (1024 ** 3)
+        available = psutil.virtual_memory().available / (1024 ** 3)
+
+        # total
+        print('CPU Total --- {:.2f}GB'.format(total))
+        # you can have the percentage of used RAM
+        print('CPU Used --- {:.2f}GB --> {}%'.format(used, psutil.virtual_memory().percent))
+
+        # you can calculate percentage of available memory
+        print('CPU Free --- {:.2f}GB --> {:.1f}%'.format(available, available * 100 / (used + available)))
+    if type =='gpu':
+        import nvidia_smi
+        nvidia_smi.nvmlInit()
+        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
+        # card id 0 hardcoded here, there is also a call to get all available card ids, so we could iterate
+
+        info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+
+        print('<<<<Total memory: {:.2f} GB Free memory: {:.2f} GB  Used memory: {:.2f} GB>>>'.format(info.total / (1024 ** 3), info.free / (1024 ** 3), info.used / (1024 ** 3)))
+        # print("Free memory:", info.free / (1024 ** 3))
+        # print("Used memory:", info.used / (1024 ** 3))
+
+        nvidia_smi.nvmlShutdown()
