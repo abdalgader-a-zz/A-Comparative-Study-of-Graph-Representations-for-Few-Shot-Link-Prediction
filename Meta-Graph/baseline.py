@@ -18,7 +18,7 @@ def replace_grad(parameter_gradients, parameter_name):
     return replace_grad_
 
 
-def meta_gradient_step(model,
+def fine_tune_method  (model,
                        args,
                        data_batch,
                        optimiser,
@@ -60,6 +60,7 @@ def meta_gradient_step(model,
     ap_list = []
     torch.autograd.set_detect_anomaly(True)
     for idx, data_graph in enumerate(data_batch):
+
         data_graph.train_mask = data_graph.val_mask = data_graph.test_mask = data_graph.y = None
         data_graph.batch = None
         num_nodes = data_graph.num_nodes
@@ -104,80 +105,45 @@ def meta_gradient_step(model,
 
         data_shape = x.shape[2:]
         create_graph = (True if order == 2 else False) and train
-
-        fast_weights = OrderedDict(model.named_parameters())
         early_stopping = EarlyStopping(patience=args.patience, verbose=False)
-
         start_time = time.time()
-        # Train the model for `inner_train_steps` iterations
+
         if args.encoder == 'DGCNN':
             x = x.unsqueeze(0).permute(0, 2, 1)
+
         for inner_batch in range(inner_train_steps):
+            model.train()
+            optimiser.zero_grad()
+
             # Perform update of model weights
             if args.encoder == 'DGCNN':
-                z = model.encode(x, fast_weights)
+                z = model.encode(x, OrderedDict(model.named_parameters()))
                 z = z.squeeze(0)
             else:
-                z = model.encode(x, train_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=True, train=train, no_sig=args.no_sig)
+                z = model.encode(x, train_pos_edge_index, OrderedDict(model.named_parameters()),\
+                                 only_gae=args.apply_gae_only, inner_loop=True, train=train, no_sig=args.no_sig)
 
-            # print('Pre ..')
-            # memories_info('cpu')
             loss = model.recon_loss(z, train_pos_edge_index)
-            # print("after..")
-            # memories_info('cpu')
             if args.model in ['VGAE']:
                 if not args.apply_gae_only:
                     kl_loss = args.kl_anneal*(1 / num_nodes) * model.kl_loss()
                     loss = loss + kl_loss
                 # print("Inner KL Loss: %f" %(kl_loss.item()))
 
-            if not args.train_only_gs:
-                gradients = torch.autograd.grad(loss, fast_weights.values(),\
-                        allow_unused=args.allow_unused, create_graph=create_graph)
-                gradients = [0 if grad is None else grad  for grad in gradients]
-
-
-                if args.wandb:
-                    if args.model in ['VGAE']:
-                         wandb.log({f"Inner_Train_Total-loss of {mode} Graph {graph_id}":loss.item()})
-                         wandb.log({f"Inner_Train_Recon-loss of {mode} Graph {graph_id}": (loss.item()-kl_loss.item())})
-                         wandb.log({f"Inner_Train_Kl-loss of {mode} Graph {graph_id}": kl_loss.item()})
-                    else:
-                        wandb.log({f"Inner_Train_loss of {mode} Graph {graph_id}": loss.item()})
-
-                if args.clip_grad:
-                    # for grad in gradients:
-                    custom_clip_grad_norm_(gradients,args.clip)
-                    grad_norm = monitor_grad_norm_2(gradients)
-                    # if args.wandb:
-                        # inner_grad_norm_metric = 'Inner_Grad_Norm'
-                        # wandb.log({inner_grad_norm_metric:grad_norm})
+            loss.backward()
+            optimiser.step()
 
             ''' Only do this if its the final test set eval '''
             if args.final_test and inner_batch % 5 ==0:
 
                 inner_test_auc, inner_test_ap = test(args, model, x, train_pos_edge_index, args.apply_gae_only,
-                        data.test_pos_edge_index, data.test_neg_edge_index,fast_weights)
+                        data.test_pos_edge_index, data.test_neg_edge_index,OrderedDict(model.named_parameters()))
                 val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
-                val_loss = val(model,args, x, args.apply_gae_only,val_pos_edge_index,data.num_nodes,fast_weights)
+                val_loss = val(model,args, x, args.apply_gae_only,val_pos_edge_index,data.num_nodes,OrderedDict(model.named_parameters()))
                 early_stopping(val_loss, model, args, final=True)
                 my_step = int(inner_batch / 5)
                 inner_test_auc_array[graph_id][my_step] = inner_test_auc
                 inner_test_ap_array[graph_id][my_step] = inner_test_ap
-
-
-            # Update weights manually
-            if not args.train_only_gs and args.clip_weight:
-                fast_weights = OrderedDict(
-                    (name, torch.clamp((param - inner_lr * grad),-args.clip_weight_val,args.clip_weight_val))
-                    for ((name, param), grad) in zip(fast_weights.items(), gradients)
-                )
-
-            elif not args.train_only_gs:
-                fast_weights = OrderedDict(
-                    (name, param - inner_lr * grad)
-                    for ((name, param), grad) in zip(fast_weights.items(), gradients)
-                )
 
             if early_stopping.early_stop:
                 print("Early stopping for Graph %d | AUC: %f AP: %f" \
@@ -192,10 +158,11 @@ def meta_gradient_step(model,
         val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
 
         if args.encoder == 'DGCNN':
-            z_val = model.encode(x, fast_weights)
+            z_val = model.encode(x, OrderedDict(model.named_parameters()))
             z_val = z_val.squeeze(0)
         else:
-            z_val = model.encode(x, val_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=False, train=train, no_sig=args.no_sig)
+            z_val = model.encode(x, val_pos_edge_index, OrderedDict(model.named_parameters()),\
+                                 only_gae=args.apply_gae_only, inner_loop=False, train=train, no_sig=args.no_sig)
 
         loss_val = model.recon_loss(z_val, val_pos_edge_index)
         if args.model in ['VGAE']:
@@ -222,7 +189,7 @@ def meta_gradient_step(model,
 
         # Get post-update accuracies
         auc, ap = test(args, model, x, train_pos_edge_index, args.apply_gae_only,
-                data.test_pos_edge_index, data.test_neg_edge_index,fast_weights)
+                data.test_pos_edge_index, data.test_neg_edge_index,OrderedDict(model.named_parameters()))
 
         auc_list.append(auc)
         ap_list.append(ap)
@@ -245,16 +212,7 @@ def meta_gradient_step(model,
     if len(auc_list) > 0 and len(ap_list) > 0 and batch_id % 5 == 0 and not args.no_meta_update:
         print('Epoch {:01d} Inner Graph Batch: {:01d}, Inner-Update AUC: {:.4f}, AP: {:.4f}'.format(epoch,batch_id,sum(auc_list)/len(auc_list),sum(ap_list)/len(ap_list)))
 
-    if args.comet:
-        if len(ap_list) > 0:
-            auc_metric = mode + '_Local_Batch_Graph_' + str(batch_id) + '_AUC'
-            ap_metric = mode + '_Local_Batch_Graph_' + str(batch_id) + '_AP'
-            avg_auc_metric = mode + '_Inner_Batch_Graph' + '_AUC'
-            avg_ap_metric = mode + '_Inner_Batch_Graph' + '_AP'
-            args.experiment.log_metric(auc_metric,sum(auc_list)/len(auc_list),step=epoch)
-            args.experiment.log_metric(ap_metric,sum(ap_list)/len(ap_list),step=epoch)
-            args.experiment.log_metric(avg_auc_metric,sum(auc_list)/len(auc_list),step=epoch)
-            args.experiment.log_metric(avg_ap_metric,sum(ap_list)/len(ap_list),step=epoch)
+
     # if args.wandb:
     #     if len(ap_list) > 0:
     #         auc_metric = mode + '_Local_Batch_Graph_' + str(batch_id) + '_AUC'
@@ -294,8 +252,8 @@ def meta_gradient_step(model,
 
     elif order == 2:
         if len(task_losses) != 0:
-            model.train()
-            optimiser.zero_grad()
+            # model.train()
+            # optimiser.zero_grad()
             meta_batch_loss = torch.stack(task_losses).mean()
 
             if not args.no_meta_update:

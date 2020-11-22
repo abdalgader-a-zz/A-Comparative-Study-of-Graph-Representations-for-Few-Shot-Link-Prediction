@@ -789,12 +789,12 @@ def memories_info(type='cpu'):
         available = psutil.virtual_memory().available / (1024 ** 3)
 
         # total
-        print('CPU Total --- {:.2f}GB'.format(total))
-        # you can have the percentage of used RAM
-        print('CPU Used --- {:.2f}GB --> {}%'.format(used, psutil.virtual_memory().percent))
+        # print('CPU Total --- {:.2f}GB'.format(total))
+        # # you can have the percentage of used RAM
+        # print('CPU Used --- {:.2f}GB --> {}%'.format(used, psutil.virtual_memory().percent))
 
         # you can calculate percentage of available memory
-        print('CPU Free --- {:.2f}GB --> {:.1f}%'.format(available, available * 100 / (used + available)))
+        print('CPU Free --- {:.2f}GB -- CPU Used --- {:.2f}GB'.format(available, used))
     if type =='gpu':
         import nvidia_smi
         nvidia_smi.nvmlInit()

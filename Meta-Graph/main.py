@@ -13,6 +13,7 @@ from torch_geometric.nn import GATConv, GCNConv
 from models.autoencoder import MyGAE, MyVGAE
 from torch_geometric.data import DataLoader
 from maml import meta_gradient_step
+from baseline import fine_tune_method
 from models.models import *
 from utils.utils import global_test, global_val_test, test, EarlyStopping, seed_everything,\
         filter_state_dict, create_nx_graph, calc_adamic_adar_score,\
@@ -25,7 +26,7 @@ import wandb
 import ipdb
 import time
 
-def test(args,meta_model,optimizer,test_loader,train_epoch,return_val=False,inner_steps=10,seed= 0, transfer_learning_weights=None):
+def test(args,meta_model,optimizer,test_loader,train_epoch,return_val=False,inner_steps=10,seed= 0):
     ''' Meta-Testing '''
     mode='Test'
     test_graph_id_local = 0
@@ -115,16 +116,20 @@ def test(args,meta_model,optimizer,test_loader,train_epoch,return_val=False,inne
             continue
 
         if not args.random_baseline and not args.adamic_adar_baseline:
-            test_graph_id_local, meta_loss, test_inner_avg_auc_list, test_inner_avg_ap_list, transfer_learning_weights = meta_gradient_step(meta_model,\
-                    args,data,optimizer,args.inner_steps,args.inner_lr,args.order,test_graph_id_local,mode,\
-                    test_inner_avg_auc_list, test_inner_avg_ap_list,train_epoch,j,False,\
-                            inner_test_auc_array,inner_test_ap_array, transfer_learning_weights)
+            if args.pre_train:
+                test_graph_id_local, meta_loss, test_inner_avg_auc_list, test_inner_avg_ap_list = meta_gradient_step(meta_model,\
+                        args,data,optimizer,args.inner_steps,args.inner_lr,args.order,test_graph_id_local,mode,\
+                        test_inner_avg_auc_list, test_inner_avg_ap_list,train_epoch,j,False,\
+                                inner_test_auc_array,inner_test_ap_array)
+            else:
+                test_graph_id_local, meta_loss, test_inner_avg_auc_list, test_inner_avg_ap_list = fine_tune_method(meta_model,\
+                        args,data,optimizer,args.inner_steps,args.inner_lr,args.order,test_graph_id_local,mode,\
+                        test_inner_avg_auc_list, test_inner_avg_ap_list,train_epoch,j,False,\
+                                inner_test_auc_array,inner_test_ap_array)
 
-        if args.no_meta_update:
-            auc_list, ap_list = global_test(args, meta_model, data, transfer_learning_weights)
-        else:
-            auc_list, ap_list = global_test(args, meta_model, data, OrderedDict(meta_model.named_parameters()))
 
+
+        auc_list, ap_list = global_test(args, meta_model, data, OrderedDict(meta_model.named_parameters()))
         test_avg_auc_list.append(sum(auc_list)/len(auc_list))
         test_avg_ap_list.append(sum(ap_list)/len(ap_list))
 
@@ -204,7 +209,7 @@ def test(args,meta_model,optimizer,test_loader,train_epoch,return_val=False,inne
         torch.save(meta_model.state_dict(), save_path)
         return max_auc, max_ap
 
-def validation(args,meta_model,optimizer,val_loader,train_epoch,return_val=False, transfer_learning_weights=None ):
+def validation(args,meta_model,optimizer,val_loader,train_epoch,return_val=False):
     ''' Meta-Valing '''
     mode='Val'
     val_graph_id_local = 0
@@ -227,12 +232,9 @@ def validation(args,meta_model,optimizer,val_loader,train_epoch,return_val=False
             val_graph_id_local, meta_loss, val_inner_avg_auc_list, val_inner_avg_ap_list = meta_gradient_step(meta_model,\
                     args,data,optimizer,args.inner_steps,args.inner_lr,args.order,val_graph_id_local,mode,\
                     val_inner_avg_auc_list,val_inner_avg_ap_list,train_epoch,j,False,\
-                            inner_val_auc_array,inner_val_ap_array, transfer_learning_weights)
+                            inner_val_auc_array,inner_val_ap_array)
 
-        if args.no_meta_update:
-            auc_list, ap_list, val_loss = global_val_test(args, meta_model, data, transfer_learning_weights)
-        else:
-            auc_list, ap_list, val_loss = global_val_test(args,meta_model,data,OrderedDict(meta_model.named_parameters()))
+        auc_list, ap_list, val_loss = global_val_test(args,meta_model,data,OrderedDict(meta_model.named_parameters()))
 
 
         val_avg_losses.append(sum(val_loss) / len(val_loss))
@@ -367,8 +369,7 @@ def main(args):
         if args.no_meta_update:
             args.epochs = 1
             args.inner_steps = args.no_meta_inner_steps
-
-        transfer_learning_weights = None
+            # fast_weights = OrderedDict(meta_model.named_parameters())
 
         start_time = time.time()
         for epoch in range(0,args.epochs):
@@ -386,15 +387,20 @@ def main(args):
                     dot.format = 'png'
                     dot.render(args.debug_name)
                     quit()
+                if not args.no_meta_update:
+                    graph_id_local, meta_loss, train_inner_avg_auc_list, train_inner_avg_ap_list = meta_gradient_step(meta_model,\
+                            args,data,optimizer,args.inner_steps,args.inner_lr,args.order,graph_id_local,\
+                            mode,train_inner_avg_auc_list, train_inner_avg_ap_list,epoch,i,True)
+                else:
+                    graph_id_local, meta_loss, train_inner_avg_auc_list, train_inner_avg_ap_list = fine_tune_method(meta_model,\
+                            args,data,optimizer,args.inner_steps,args.inner_lr,args.order,graph_id_local,\
+                            mode,train_inner_avg_auc_list, train_inner_avg_ap_list,epoch,i,True)
 
-                graph_id_local, meta_loss, train_inner_avg_auc_list, train_inner_avg_ap_list, transfer_learning_weights = meta_gradient_step(meta_model,\
-                        args,data,optimizer,args.inner_steps,args.inner_lr,args.order,graph_id_local,\
-                        mode,train_inner_avg_auc_list, train_inner_avg_ap_list,epoch,i,True, transfer_learning_weights=transfer_learning_weights)
                 if args.do_kl_anneal:
                     args.kl_anneal = args.kl_anneal + 1/args.epochs
 
                 if args.no_meta_update:
-                    auc_list, ap_list = global_test(args,meta_model,data,transfer_learning_weights)
+                    auc_list, ap_list = global_test(args,meta_model,data,OrderedDict(meta_model.named_parameters()))
                 else:
                     auc_list, ap_list = global_test(args, meta_model, data, OrderedDict(meta_model.named_parameters()))
 
@@ -478,12 +484,12 @@ def main(args):
 
 
         'Load the last checkpoint with best_model'
-
-        if os.path.isfile(f'./checkpoints/sig_checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt') == True:
-            print(f'Load the model in the sig_checkpoint ({args.meta_train_edge_ratio})(-{args.seed}).pt....')
-            meta_model.load_state_dict(torch.load(f'./checkpoints/sig_checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt'))
-        else:
-            print('No checkpoint saved')
+        if not args.no_meta_update:
+            if os.path.isfile(f'./checkpoints/sig_checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt') == True:
+                print(f'Load the model in the sig_checkpoint ({args.meta_train_edge_ratio})(-{args.seed}).pt....')
+                meta_model.load_state_dict(torch.load(f'./checkpoints/sig_checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt'))
+            else:
+                print('No checkpoint saved')
 
         ''' Save Global Params '''
         if not os.path.exists('../saved_models/'):
@@ -497,14 +503,14 @@ def main(args):
         if args.ego:
             optimizer = torch.optim.Adam(meta_model.parameters(), lr=args.meta_lr)
             args.inner_lr = args.inner_lr * args.reset_inner_factor
+
         print('.....VALIDATING......')
         if args.no_meta_update:
             val_inner_avg_auc, val_inner_avg_ap = test(args,meta_model,optimizer,val_loader,epoch,\
-                return_val=True,inner_steps=args.no_meta_inner_steps, transfer_learning_weights=transfer_learning_weights)
+                return_val=True, inner_steps=args.no_meta_inner_steps)
         else:
             val_inner_avg_auc, val_inner_avg_ap = test(args, meta_model, optimizer, val_loader, epoch, \
-                                                       return_val=True, inner_steps=args.no_meta_inner_steps,
-                                                       transfer_learning_weights=transfer_learning_weights)
+                                                       return_val=True, inner_steps=1000)
 
         if args.ego:
             optimizer = torch.optim.Adam(meta_model.parameters(), lr=args.meta_lr)
@@ -513,10 +519,10 @@ def main(args):
         if args.no_meta_update:
 
             test_inner_avg_auc, test_inner_avg_ap = test(args,meta_model,optimizer,test_loader,epoch,\
-                return_val=True,inner_steps=args.no_meta_inner_steps, transfer_learning_weights=transfer_learning_weights)
+                return_val=True,inner_steps=args.no_meta_inner_steps)
         else:
             test_inner_avg_auc, test_inner_avg_ap = test(args, meta_model, optimizer, test_loader, epoch, \
-                                                         return_val=True, inner_steps=args.no_meta_inner_steps)
+                                                         return_val=True, inner_steps=1000)
         if args.comet:
             args.experiment.end()
 
