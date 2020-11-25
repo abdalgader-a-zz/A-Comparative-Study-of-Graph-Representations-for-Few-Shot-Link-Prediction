@@ -79,7 +79,7 @@ class DGCNN(torch.nn.Module):
 
         self.LReLU = nn.LeakyReLU(negative_slope=0.2)
 
-        self.conv1 = DGConv2d(100, 64, kernel_size=1, bias=True)
+        self.conv1 = DGConv2d(120, 64, kernel_size=1, bias=True)
         self.bn1 = nn.BatchNorm2d(64)
 
 

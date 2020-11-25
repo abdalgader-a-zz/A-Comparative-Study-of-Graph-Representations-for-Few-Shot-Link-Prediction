@@ -116,13 +116,13 @@ def test(args,meta_model,optimizer,test_loader,train_epoch,return_val=False,inne
             continue
 
         if not args.random_baseline and not args.adamic_adar_baseline:
-            if args.pre_train:
-                test_graph_id_local, meta_loss, test_inner_avg_auc_list, test_inner_avg_ap_list = meta_gradient_step(meta_model,\
+            if args.no_meta_update:
+                test_graph_id_local, meta_loss, test_inner_avg_auc_list, test_inner_avg_ap_list = fine_tune_method(meta_model,\
                         args,data,optimizer,args.inner_steps,args.inner_lr,args.order,test_graph_id_local,mode,\
                         test_inner_avg_auc_list, test_inner_avg_ap_list,train_epoch,j,False,\
                                 inner_test_auc_array,inner_test_ap_array)
             else:
-                test_graph_id_local, meta_loss, test_inner_avg_auc_list, test_inner_avg_ap_list = fine_tune_method(meta_model,\
+                test_graph_id_local, meta_loss, test_inner_avg_auc_list, test_inner_avg_ap_list = meta_gradient_step(meta_model,\
                         args,data,optimizer,args.inner_steps,args.inner_lr,args.order,test_graph_id_local,mode,\
                         test_inner_avg_auc_list, test_inner_avg_ap_list,train_epoch,j,False,\
                                 inner_test_auc_array,inner_test_ap_array)
