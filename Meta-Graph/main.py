@@ -504,6 +504,8 @@ def main(args):
             optimizer = torch.optim.Adam(meta_model.parameters(), lr=args.meta_lr)
             args.inner_lr = args.inner_lr * args.reset_inner_factor
 
+        args.meta_lr/=10
+
         print('.....VALIDATING......')
         if args.no_meta_update:
             val_inner_avg_auc, val_inner_avg_ap = test(args,meta_model,optimizer,val_loader,epoch,\
