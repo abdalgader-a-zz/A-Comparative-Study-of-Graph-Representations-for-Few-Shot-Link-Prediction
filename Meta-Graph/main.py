@@ -501,10 +501,9 @@ def main(args):
         ''' Run to Convergence '''
         print(40 * '#', 'Run to Convergence', 40 * '#')
         if args.ego:
-            optimizer = torch.optim.Adam(meta_model.parameters(), lr=args.meta_lr)
+            optimizer = torch.optim.Adam(meta_model.parameters(), lr=args.meta_lr/10)
             args.inner_lr = args.inner_lr * args.reset_inner_factor
 
-        args.meta_lr/=10
 
         print('.....VALIDATING......')
         if args.no_meta_update:
