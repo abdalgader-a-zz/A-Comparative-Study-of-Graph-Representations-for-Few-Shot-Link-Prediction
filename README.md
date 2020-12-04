@@ -4,7 +4,7 @@
 
 # Enviroment
 
-The requierd packages for the enviroment can be founded here [requirements.txt](Meta-Graph/requirements.txt). The main packages are:
+The requierd packages for the enviroment can be founded here [requirements.txt](requirements.txt). The main packages are:
 * torch==1.4.0
 * torch-scatter==latest
 * torch-sparse==latest
