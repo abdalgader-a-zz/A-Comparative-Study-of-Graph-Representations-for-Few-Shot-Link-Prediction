@@ -55,7 +55,6 @@ def meta_gradient_step(model,
 
     task_gradients = []
     task_losses = []
-    task_predictions = []
     auc_list = []
     ap_list = []
     torch.autograd.set_detect_anomaly(True)
@@ -102,16 +101,19 @@ def meta_gradient_step(model,
             print("Failed Splitting data on Graph %d" %(graph_id))
             continue
 
-        data_shape = x.shape[2:]
         create_graph = (True if order == 2 else False) and train
 
         fast_weights = OrderedDict(model.named_parameters())
         early_stopping = EarlyStopping(patience=args.patience, verbose=False)
 
-        start_time = time.time()
-        # Train the model for `inner_train_steps` iterations
+
+
+
+
         if args.encoder == 'DGCNN':
             x = x.unsqueeze(0).permute(0, 2, 1)
+
+        # Train the model for `inner_train_steps` iterations
         for inner_batch in range(inner_train_steps):
             # Perform update of model weights
             if args.encoder == 'DGCNN':
@@ -120,11 +122,9 @@ def meta_gradient_step(model,
             else:
                 z = model.encode(x, train_pos_edge_index, fast_weights, only_gae=args.apply_gae_only, inner_loop=True, train=train, no_sig=args.no_sig)
 
-            # print('Pre ..')
-            # memories_info('cpu')
+
             loss = model.recon_loss(z, train_pos_edge_index)
-            # print("after..")
-            # memories_info('cpu')
+
             if args.model in ['VGAE']:
                 if not args.apply_gae_only:
                     kl_loss = args.kl_anneal*(1 / num_nodes) * model.kl_loss()
@@ -238,11 +238,7 @@ def meta_gradient_step(model,
             task_gradients.append(named_grads)
 
 
-    if args.no_meta_update:
-        print('Inner Graph Batch: {:01d}, Inner-Update AUC: {:.4f}, AP: {:.4f} --- ({:.4f} minutes)'.format(batch_id, sum(auc_list) / len(auc_list), sum(ap_list) / len(ap_list), (time.time()-start_time)/60))
-
-
-    if len(auc_list) > 0 and len(ap_list) > 0 and batch_id % 5 == 0 and not args.no_meta_update:
+    if len(auc_list) > 0 and len(ap_list) > 0 and batch_id % 5 == 0:
         print('Epoch {:01d} Inner Graph Batch: {:01d}, Inner-Update AUC: {:.4f}, AP: {:.4f}'.format(epoch,batch_id,sum(auc_list)/len(auc_list),sum(ap_list)/len(ap_list)))
 
     if args.comet:
@@ -313,12 +309,7 @@ def meta_gradient_step(model,
                         for p in model.parameters():
                             p.data.clamp_(-args.clip_weight_val,args.clip_weight_val)
 
-        # memories_info('gpu')
-        #
-        # # free memory after do inner steps on a graph
-        # del gradients, model, loss, z_val, optimiser, z, x, val_pos_edge_index, data, data_batch, data_graph
-        # torch.cuda.empty_cache()
-        # memories_info('gpu')
+
         return graph_id, meta_batch_loss, inner_avg_auc_list, inner_avg_ap_list
     else:
         raise ValueError('Order must be either 1 or 2.')

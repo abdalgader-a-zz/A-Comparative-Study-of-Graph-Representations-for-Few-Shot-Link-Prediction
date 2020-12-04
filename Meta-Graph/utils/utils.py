@@ -208,7 +208,12 @@ def global_val_test(args, model, data_batch, weights):
             continue
 
         with torch.no_grad():
-            z = model.encode(x, train_pos_edge_index,weights, only_gae=args.apply_gae_only, no_sig=args.no_sig)
+            if args.encoder == 'DGCNN':
+                x = x.unsqueeze(0).permute(0, 2, 1)
+                z = model.encode(x, weights)
+                z = z.squeeze(0)
+            else:
+                z = model.encode(x, train_pos_edge_index,weights, only_gae=args.apply_gae_only, no_sig=args.no_sig)
 
         val_loss = model.recon_loss(z, train_pos_edge_index)
         auc, ap = model.test(z, pos_edge_index, neg_edge_index)
@@ -530,9 +535,15 @@ class EarlyStopping:
         if self.verbose:
             print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
         if not final:
-            torch.save(model.state_dict(), f'./checkpoints/sig_checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt')
+            if args.encoder == 'DGCNN':
+                torch.save(model.state_dict(),f'./checkpoints/checkpoint_{args.model}_{args.encoder}_({args.meta_train_edge_ratio})(-{args.seed}).pt')
+            else:
+                torch.save(model.state_dict(), f'./checkpoints/checkpoint_{args.model}_{args.encoder}_sig({not args.no_sig})({args.meta_train_edge_ratio})(-{args.seed}).pt')
         else:
-            torch.save(model.state_dict(), f'./checkpoints/sig_final_checkpoint({args.meta_train_edge_ratio})(-{args.seed}).pt')
+            if args.encoder == 'DGCNN':
+                torch.save(model.state_dict(), f'./checkpoints/final_checkpoint_meta_{args.model}_{args.encoder}_({args.meta_train_edge_ratio})(-{args.seed}).pt')
+            else:
+                torch.save(model.state_dict(), f'./checkpoints/final_checkpoint_meta_{args.model}_{args.encoder}_sig({not args.no_sig})({args.meta_train_edge_ratio})(-{args.seed}).pt')
         self.val_loss_min = val_loss
 
 def create_masked_networkx_graph(data):

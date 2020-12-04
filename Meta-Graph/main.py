@@ -14,6 +14,7 @@ from models.autoencoder import MyGAE, MyVGAE
 from torch_geometric.data import DataLoader
 from maml import meta_gradient_step
 from baseline import fine_tune_method
+from meta_dgcnn import meta_dgcnn_step
 from models.models import *
 from utils.utils import global_test, global_val_test, test, EarlyStopping, seed_everything,\
         filter_state_dict, create_nx_graph, calc_adamic_adar_score,\
@@ -25,6 +26,7 @@ import numpy as np
 import wandb
 import ipdb
 import time
+import copy
 
 def test(args,meta_model,optimizer,test_loader,train_epoch,return_val=False,inner_steps=10,seed= 0):
     ''' Meta-Testing '''
@@ -47,81 +49,13 @@ def test(args,meta_model,optimizer,test_loader,train_epoch,return_val=False,inne
     test_avg_auc_list, test_avg_ap_list = [], []
     test_inner_avg_auc_list, test_inner_avg_ap_list = [], []
     for j,data in enumerate(test_loader):
-        if args.adamic_adar_baseline:
-            # Val Ratio is Fixed at 0.1
-            meta_test_edge_ratio = 1 - args.meta_val_edge_ratio - args.meta_train_edge_ratio
-            data = meta_model.split_edges(data[0],val_ratio=args.meta_val_edge_ratio,\
-                    test_ratio=meta_test_edge_ratio)
-            G_test = create_nx_graph(data)
-            auc, ap = calc_adamic_adar_score(G_test,data.test_pos_edge_index,data.test_neg_edge_index)
-            test_avg_auc_list.append(auc)
-            test_avg_ap_list.append(ap)
-            test_graph_id_global += 1
-            continue
-        if args.deepwalk_baseline or args.deepwalk_and_mlp:
-            # Val Ratio is Fixed at 0.2
-            meta_test_edge_ratio = 1 - args.meta_val_edge_ratio - args.meta_train_edge_ratio
-            data = meta_model.split_edges(data[0], val_ratio=args.meta_val_edge_ratio, \
-                                          test_ratio=meta_test_edge_ratio)
-            G = create_nx_graph_deepwalk(data)
-            node_vectors, entity2index, index2entity = train_deepwalk_model(G,seed=seed)
-            if args.deepwalk_and_mlp:
-                early_stopping = EarlyStopping(patience=args.patience, verbose=False)
-                input_dim = args.num_features + node_vectors.shape[1]
-                mlp = MLPEncoder(args, input_dim,
-                                 args.num_channels).to(args.dev)
-                mlp_optimizer = torch.optim.Adam(mlp.parameters(),
-                                                 lr=args.mlp_lr)
-                # node1 = data.x[torch.tensor(list(entity2index.keys())).long()]
-                all_node_list = list(range(0, len(data.x)))
-                node_order = [entity2index[node_i] for node_i in all_node_list]
-                node1 = torch.tensor(node_vectors[node_order])
-                for mlp_epochs in range(0, args.epochs):
-                    mlp_optimizer.zero_grad()
-                    # node_inp = torch.cat([torch.tensor(node_vectors), node1], dim=1)
-                    node_inp = torch.cat([data.x, node1], dim=1)
-                    node_inp = node_inp.to(args.dev)
-                    z = mlp(node_inp, edge_index=None)
-                    loss = meta_model.recon_loss(z, data.train_pos_edge_index.cuda())
-                    loss.backward()
-                    mlp_optimizer.step()
-                    if mlp_epochs % 10 == 0:
-                        if mlp_epochs % 50 == 0:
-                            print("Epoch %d, Loss: %f" %(mlp_epochs, loss))
-                        with torch.no_grad():
-                            val_auc, val_ap = meta_model.test(z, data.val_pos_edge_index,
-                                                 data.val_neg_edge_index)
-                        early_stopping(val_auc, meta_model)
-                    if early_stopping.early_stop:
-                        print("Early stopping for Graph %d | AUC: %f AP: %f" \
-                                %(test_graph_id_global, val_auc, val_ap))
-                        break
 
-                node_inp = torch.cat([data.x, node1], dim=1)
-                # node_inp = torch.cat([torch.tensor(node_vectors), node1], dim=1)
-                node_inp = node_inp.to(args.dev)
-                node_vectors = mlp(node_inp, edge_index=None)
-                auc, ap = meta_model.test(z, data.test_pos_edge_index,
-                                     data.test_neg_edge_index)
-            else:
-                node_vectors = node_vectors.detach().cpu().numpy()
-                auc, ap = calc_deepwalk_score(data.test_pos_edge_index,
-                                              data.test_neg_edge_index,
-                                              node_vectors,entity2index)
-
-            print("Graph %d| Test AUC: %f AP: %f" %(test_graph_id_global, auc, ap))
-            test_avg_auc_list.append(auc)
-            test_avg_ap_list.append(ap)
-            test_graph_id_global += 1
-            continue
-
-        if not args.random_baseline and not args.adamic_adar_baseline:
-            if args.no_meta_update:
+        if args.no_meta_update:
                 test_graph_id_local, meta_loss, test_inner_avg_auc_list, test_inner_avg_ap_list = fine_tune_method(meta_model,\
-                        args,data,optimizer,args.inner_steps,args.inner_lr,args.order,test_graph_id_local,mode,\
-                        test_inner_avg_auc_list, test_inner_avg_ap_list,train_epoch,j,False,\
+                        args,data,optimizer,args.inner_steps,test_graph_id_local,mode,\
+                        test_inner_avg_auc_list, test_inner_avg_ap_list,j,False,\
                                 inner_test_auc_array,inner_test_ap_array)
-            else:
+        else:
                 test_graph_id_local, meta_loss, test_inner_avg_auc_list, test_inner_avg_ap_list = meta_gradient_step(meta_model,\
                         args,data,optimizer,args.inner_steps,args.inner_lr,args.order,test_graph_id_local,mode,\
                         test_inner_avg_auc_list, test_inner_avg_ap_list,train_epoch,j,False,\
@@ -316,12 +250,12 @@ def main(args):
                   'GraphSignature': MetaSignatureEncoder,
                    'GatedGraphSignature': MetaGatedSignatureEncoder, 'DGCNN':DGCNN}
 
-    path = osp.join(
-        osp.dirname(osp.realpath(__file__)), '..', 'data', args.dataset)
+
     train_loader, val_loader, test_loader = load_dataset(args.dataset,args)
 
     if args.encoder == 'DGCNN':
         meta_model = kwargs[args.model](kwargs_enc[args.encoder](args, args.dev)).to(args.dev)
+        fast_model = kwargs[args.model](kwargs_enc[args.encoder](args, args.dev)).to(args.dev)
     else:
         meta_model = kwargs[args.model](kwargs_enc[args.encoder](args, args.num_features, args.num_channels)).to(args.dev)
     if args.train_only_gs:
@@ -335,6 +269,7 @@ def main(args):
     else:
         optimizer = torch.optim.Adam(meta_model.parameters(), lr=args.meta_lr)
 
+
     total_loss = 0
     if not args.do_kl_anneal:
         args.kl_anneal = 1
@@ -343,20 +278,6 @@ def main(args):
         args.allow_unused = True
     else:
         args.allow_unused = False
-
-    ''' Random or Adamic Adar Baseline '''
-    if args.random_baseline or args.adamic_adar_baseline or args.deepwalk_baseline:
-        test_inner_avg_auc, test_inner_avg_ap = test(args,meta_model,optimizer,test_loader,0,\
-                return_val=True,inner_steps=1000,seed=args.seed)
-        sys.exit()
-
-    ''' Run WL-Kernel '''
-    if args.wl:
-        load_path = '../saved_models/' + args.namestr + '.pt'
-        meta_model.load_state_dict(torch.load(load_path))
-        run_analysis(args, meta_model,train_loader)
-        test(args,meta_model,optimizer,test_loader,0)
-        sys.exit()
 
     if args.pre_train:
         ''' Meta-training '''
@@ -369,7 +290,7 @@ def main(args):
         if args.no_meta_update:
             args.epochs = 1
             args.inner_steps = args.no_meta_inner_steps
-            # fast_weights = OrderedDict(meta_model.named_parameters())
+
 
         start_time = time.time()
         for epoch in range(0,args.epochs):
@@ -379,23 +300,26 @@ def main(args):
             if epoch > 0 and args.dataset !='PPI':
                 args.resplit = False
             for i,data in enumerate(train_loader):
+
+                if args.no_meta_update:
+                    graph_id_local, meta_loss, train_inner_avg_auc_list, train_inner_avg_ap_list = fine_tune_method(meta_model,\
+                            args,data,optimizer,args.inner_steps,graph_id_local,\
+                            mode,train_inner_avg_auc_list, train_inner_avg_ap_list,i,True)
+
+                else:
+                        graph_id_local, meta_loss, train_inner_avg_auc_list, train_inner_avg_ap_list = meta_gradient_step(meta_model,\
+                                args,data,optimizer,args.inner_steps,args.inner_lr,args.order,graph_id_local,\
+                                mode,train_inner_avg_auc_list, train_inner_avg_ap_list,epoch,i,True)
+
+
                 if args.debug:
                     ''' Print the Computation Graph '''
                     dot = make_dot(meta_gradient_step(meta_model,args,data,optimizer,args.inner_steps,args.inner_lr,\
-                            args.order,graph_id_local,mode,test_inner_avg_auc_list, test_inner_avg_ap_list, \
+                            args.order,graph_id_local,mode,train_inner_avg_auc_list, train_inner_avg_ap_list, \
                             epoch,i,True)[1],params=dict(meta_model.named_parameters()))
                     dot.format = 'png'
                     dot.render(args.debug_name)
                     quit()
-                if not args.no_meta_update:
-                    graph_id_local, meta_loss, train_inner_avg_auc_list, train_inner_avg_ap_list = meta_gradient_step(meta_model,\
-                            args,data,optimizer,args.inner_steps,args.inner_lr,args.order,graph_id_local,\
-                            mode,train_inner_avg_auc_list, train_inner_avg_ap_list,epoch,i,True)
-                else:
-                    graph_id_local, meta_loss, train_inner_avg_auc_list, train_inner_avg_ap_list = fine_tune_method(meta_model,\
-                            args,data,optimizer,args.inner_steps,args.inner_lr,args.order,graph_id_local,\
-                            mode,train_inner_avg_auc_list, train_inner_avg_ap_list,epoch,i,True)
-
                 if args.do_kl_anneal:
                     args.kl_anneal = args.kl_anneal + 1/args.epochs
 
@@ -412,19 +336,14 @@ def main(args):
                         ap_metric = 'Train_Global_Batch_Graph_' + str(i) +'_AP'
                         args.experiment.log_metric(auc_metric,sum(auc_list)/len(auc_list),step=epoch)
                         args.experiment.log_metric(ap_metric,sum(ap_list)/len(ap_list),step=epoch)
-                # if args.wandb:
-                #     if len(ap_list) > 0:
-                #             auc_metric = 'Train_Global_Batch_Graph_' + str(i) +'_AUC'
-                #             ap_metric = 'Train_Global_Batch_Graph_' + str(i) +'_AP'
-                #             wandb.log({auc_metric:sum(auc_list)/len(auc_list),\
-                #                     ap_metric:sum(ap_list)/len(ap_list),"x":epoch},commit=False)
+                if args.wandb:
+                    if len(ap_list) > 0:
+                            auc_metric = 'Train_Global_Batch_Graph_' + str(i) +'_AUC'
+                            ap_metric = 'Train_Global_Batch_Graph_' + str(i) +'_AP'
+                            wandb.log({auc_metric:sum(auc_list)/len(auc_list),\
+                                    ap_metric:sum(ap_list)/len(ap_list),"x":epoch},commit=False)
                 graph_id_global += len(ap_list)
-                # print("Empty cash ...................")
-                # torch.cuda.empty_cache()
-                # memories_info('gpu')
 
-                # if args.wandb:
-                #     wandb.log()
 
             if args.comet:
                 if len(train_inner_avg_ap_list) > 0:
@@ -444,9 +363,6 @@ def main(args):
                 print('Train Inner AUC: {:.4f}, AP: {:.4f}'.format(sum(train_inner_avg_auc_list)/len(train_inner_avg_auc_list),\
                                 sum(train_inner_avg_ap_list)/len(train_inner_avg_ap_list)))
 
-            # print("Empty cash ...................")
-            # torch.cuda.empty_cache()
-            # memories_info('gpu')
 
             if not args.no_meta_update:
                 ''' Meta-Testing After every Epoch'''
@@ -500,9 +416,8 @@ def main(args):
 
         ''' Run to Convergence '''
         print(40 * '#', 'Run to Convergence', 40 * '#')
-        if args.ego:
-            optimizer = torch.optim.Adam(meta_model.parameters(), lr=args.meta_lr)
-            args.inner_lr = args.inner_lr * args.reset_inner_factor
+        # reduce the learning rate by 10
+        optimizer = torch.optim.Adam(meta_model.parameters(), lr=args.meta_lr/10)
 
         print('.....VALIDATING......')
         if args.no_meta_update:
@@ -510,7 +425,7 @@ def main(args):
                 return_val=True, inner_steps=args.no_meta_inner_steps)
         else:
             val_inner_avg_auc, val_inner_avg_ap = test(args, meta_model, optimizer, val_loader, epoch, \
-                                                       return_val=True, inner_steps=1000)
+                                                       return_val=True, inner_steps=2)
 
         if args.ego:
             optimizer = torch.optim.Adam(meta_model.parameters(), lr=args.meta_lr)
@@ -522,7 +437,7 @@ def main(args):
                 return_val=True,inner_steps=args.no_meta_inner_steps)
         else:
             test_inner_avg_auc, test_inner_avg_ap = test(args, meta_model, optimizer, test_loader, epoch, \
-                                                         return_val=True, inner_steps=1000)
+                                                         return_val=True, inner_steps=2)
         if args.comet:
             args.experiment.end()
 
@@ -662,7 +577,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--pre_train', default=False, action='store_true', help='use meta-update setup')
     parser.add_argument('--no_meta_update', default=False, action='store_true', help='use meta-update setup')
-    parser.add_argument('--no_meta_inner_steps', type=int, default=1000, help="Inner steps of the training when no meta-learning")
+    parser.add_argument('--no_meta_inner_steps', type=int, default=10, help="Inner steps of the training when no meta-learning")
     parser.add_argument('--no_sig', default=False, action='store_true', help='No signature flag')
     parser.add_argument('--checkpoins', default=False, action='store_true', help='apply Early Stopping')
 

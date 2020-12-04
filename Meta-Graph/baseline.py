@@ -1,12 +1,7 @@
 import torch
-from torch import autograd
 from collections import OrderedDict
-from torch.optim import Optimizer
-from torch.nn import Module
-from typing import Dict, List, Callable, Union
-from utils.utils import custom_clip_grad_norm_, val, test, EarlyStopping, monitor_grad_norm, monitor_grad_norm_2, monitor_weight_norm,  memories_info
+from utils.utils import  val, test, EarlyStopping
 from torchviz import make_dot
-import ipdb
 import wandb
 from copy import deepcopy
 import time
@@ -23,13 +18,10 @@ def fine_tune_method  (model,
                        data_batch,
                        optimiser,
                        inner_train_steps,
-                       inner_lr,
-                       order,
                        graph_id,
                        mode,
                        inner_avg_auc_list,
                        inner_avg_ap_list,
-                       epoch,
                        batch_id,
                        train,
                        inner_test_auc_array=None,
@@ -43,22 +35,18 @@ def fine_tune_method  (model,
         data_batch: Input samples for all few shot tasks
             meta-gradients after applying the update to
         inner_train_steps: Number of gradient steps to fit the fast weights during each inner update
-        inner_lr: Learning rate used to update the fast weights on the inner update
-        order: Whether to use 1st order MAML (update meta-learner weights with gradients of the updated weights on the
-            query set) or 2nd order MAML (use 2nd order updates by differentiating through the gradients of the updated
-            weights on the query with respect to the original weights).
         graph_id: The ID of graph currently being trained
         train: Whether to update the meta-learner weights at the end of the episode.
         inner_test_auc_array: Final Test AUC array where we train to convergence
         inner_test_ap_array: Final Test AP array where we train to convergence
     """
 
-    task_gradients = []
     task_losses = []
-    task_predictions = []
     auc_list = []
     ap_list = []
     torch.autograd.set_detect_anomaly(True)
+
+
     for idx, data_graph in enumerate(data_batch):
 
         data_graph.train_mask = data_graph.val_mask = data_graph.test_mask = data_graph.y = None
@@ -103,8 +91,6 @@ def fine_tune_method  (model,
             print("Failed Splitting data on Graph %d" %(graph_id))
             continue
 
-        data_shape = x.shape[2:]
-        create_graph = (True if order == 2 else False) and train
         early_stopping = EarlyStopping(patience=args.patience, verbose=False)
         start_time = time.time()
 
@@ -128,7 +114,7 @@ def fine_tune_method  (model,
                 if not args.apply_gae_only:
                     kl_loss = args.kl_anneal*(1 / num_nodes) * model.kl_loss()
                     loss = loss + kl_loss
-                # print("Inner KL Loss: %f" %(kl_loss.item()))
+
 
             loss.backward()
             optimiser.step()
@@ -145,14 +131,6 @@ def fine_tune_method  (model,
                 inner_test_auc_array[graph_id][my_step] = inner_test_auc
                 inner_test_ap_array[graph_id][my_step] = inner_test_ap
 
-            if early_stopping.early_stop:
-                print("Early stopping for Graph %d | AUC: %f AP: %f" \
-                        %(graph_id, inner_test_auc, inner_test_ap))
-                my_step = int(epoch / 5)
-                inner_test_auc_array[graph_id][my_step:,] = inner_test_auc
-                inner_test_ap_array[graph_id][my_step:,] = inner_test_ap
-                break
-
 
         # Do a pass of the model on the validation data from the current task
         val_pos_edge_index = data.val_pos_edge_index.to(args.dev)
@@ -168,24 +146,15 @@ def fine_tune_method  (model,
         if args.model in ['VGAE']:
             if not args.apply_gae_only:
                 kl_loss = args.kl_anneal*(1 / num_nodes) * model.kl_loss()
-                # print("Outer KL Loss: %f" %(kl_loss.item()))
                 loss_val = loss_val + kl_loss
 
         if args.wandb:
-
             if args.model in ['VGAE']:
                 wandb.log({f"Inner_Val_Total-loss of {mode} Graph {graph_id}":loss_val.item()})
                 wandb.log({f"Inner_Val_Recon-loss of {mode} Graph {graph_id}":(loss_val.item()-kl_loss.item())})
                 wandb.log({f"Inner_Val_Kl-loss of {mode} Graph {graph_id}":kl_loss.item()})
             else:
                 wandb.log({f"Inner_Val_loss of {mode} Graph {graph_id}":loss_val.item()})
-
-            # print("Inner Val Loss %f" % (loss_val.item()))
-
-        ##TODO: Is this backward call needed here? Not sure because original repo has it
-        # https://github.com/oscarknagg/few-shot/blob/master/few_shot/maml.py#L84
-        if args.extra_backward:
-            loss_val.backward(retain_graph=True)
 
         # Get post-update accuracies
         auc, ap = test(args, model, x, train_pos_edge_index, args.apply_gae_only,
@@ -199,19 +168,10 @@ def fine_tune_method  (model,
         # Accumulate losses and gradients
         graph_id += 1
         task_losses.append(loss_val)
-        if order == 1:
-            gradients = torch.autograd.grad(loss_val, fast_weights.values(), create_graph=create_graph)
-            named_grads = {name: g for ((name, _), g) in zip(fast_weights.items(), gradients)}
-            task_gradients.append(named_grads)
-
 
     if args.no_meta_update:
-        print('Inner Graph Batch: {:01d}, Inner-Update AUC: {:.4f}, AP: {:.4f} --- ({:.4f} minutes)'.format(batch_id, sum(auc_list) / len(auc_list), sum(ap_list) / len(ap_list), (time.time()-start_time)/60))
-
-
-    if len(auc_list) > 0 and len(ap_list) > 0 and batch_id % 5 == 0 and not args.no_meta_update:
-        print('Epoch {:01d} Inner Graph Batch: {:01d}, Inner-Update AUC: {:.4f}, AP: {:.4f}'.format(epoch,batch_id,sum(auc_list)/len(auc_list),sum(ap_list)/len(ap_list)))
-
+        print('Inner Graph Batch: {:01d}, Inner-Update AUC: {:.4f}, AP: {:.4f} --- ({:.4f} minutes)'.format(batch_id,\
+                            sum(auc_list) / len(auc_list), sum(ap_list) / len(ap_list), (time.time()-start_time)/60))
 
     # if args.wandb:
     #     if len(ap_list) > 0:
@@ -222,61 +182,10 @@ def fine_tune_method  (model,
     #         wandb.log({auc_metric:sum(auc_list)/len(auc_list),ap_metric:sum(ap_list)/len(ap_list),\
     #                 avg_auc_metric:sum(auc_list)/len(auc_list),avg_ap_metric:sum(ap_list)/len(ap_list)})
 
-    meta_batch_loss = torch.Tensor([0])
-    if order == 1:
-        if train and len(task_losses) != 0:
-            sum_task_gradients = {k: torch.stack([grad[k] for grad in task_gradients]).mean(dim=0)
-                                  for k in task_gradients[0].keys()}
-            hooks = []
-            for name, param in model.named_parameters():
-                hooks.append(
-                    param.register_hook(replace_grad(sum_task_gradients, name))
-                )
 
-            model.train()
-            optimiser.zero_grad()
-            # Dummy pass in order to create `loss` variable
-            # Replace dummy gradients with mean task gradients using hooks
-            ## TODO: Double check if you really need functional forward here
-            z_dummy = model.encode(torch.zeros(x.shape[0],x.shape[1]).float().cuda(), \
-                    torch.zeros(train_pos_edge_index.shape[0],train_pos_edge_index.shape[1]).long().cuda(), fast_weights, train=train, no_sig=args.no_sig)
-            loss = model.recon_loss(z_dummy,torch.zeros(train_pos_edge_index.shape[0],\
-                    train_pos_edge_index.shape[1]).long().cuda())
-            loss.backward()
-            optimiser.step()
-
-            for h in hooks:
-                h.remove()
-            meta_batch_loss = torch.stack(task_losses).mean()
+    if len(task_losses) != 0:
+        meta_batch_loss = torch.stack(task_losses).mean()
         return graph_id, meta_batch_loss, inner_avg_auc_list, inner_avg_ap_list
 
-    elif order == 2:
-        if len(task_losses) != 0:
-            # model.train()
-            # optimiser.zero_grad()
-            meta_batch_loss = torch.stack(task_losses).mean()
 
-            if not args.no_meta_update:
-                if train:
-                    meta_batch_loss.backward()
-                    if args.clip_grad:
-                        torch.nn.utils.clip_grad_norm_(model.parameters(),args.clip)
-                        grad_norm = monitor_grad_norm(model)
-                        if args.wandb:
-                            outer_grad_norm_metric = 'Outer_Grad_Norm'
-                            wandb.log({outer_grad_norm_metric:grad_norm})
 
-                    optimiser.step()
-                    if args.clip_weight:
-                        for p in model.parameters():
-                            p.data.clamp_(-args.clip_weight_val,args.clip_weight_val)
-
-        # memories_info('gpu')
-        #
-        # # free memory after do inner steps on a graph
-        # del gradients, model, loss, z_val, optimiser, z, x, val_pos_edge_index, data, data_batch, data_graph
-        # torch.cuda.empty_cache()
-        # memories_info('gpu')
-        return graph_id, meta_batch_loss, inner_avg_auc_list, inner_avg_ap_list
-    else:
-        raise ValueError('Order must be either 1 or 2.')
