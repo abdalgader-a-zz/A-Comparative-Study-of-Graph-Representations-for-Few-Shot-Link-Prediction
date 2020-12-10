@@ -318,10 +318,7 @@ def main(args):
                 if args.do_kl_anneal:
                     args.kl_anneal = args.kl_anneal + 1/args.epochs
 
-                if args.no_meta_update:
-                    auc_list, ap_list = global_test(args,meta_model,data,OrderedDict(meta_model.named_parameters()))
-                else:
-                    auc_list, ap_list = global_test(args, meta_model, data, OrderedDict(meta_model.named_parameters()))
+                auc_list, ap_list = global_test(args, meta_model, data, OrderedDict(meta_model.named_parameters()))
 
                 # print('Global Graph Batch {} AUC: {:.4f}, AP: {:.4f}'.format(graph_id_global, sum(auc_list) / len(auc_list),sum(ap_list) / len(ap_list)))
 
@@ -541,7 +538,7 @@ if __name__ == '__main__':
 		help='Use comet for logging')
     parser.add_argument("--wandb", action="store_true", default=False,
 		help='Use wandb for logging')
-    parser.add_argument("--comet_username", type=str, default="joeybose",
+    parser.add_argument("--comet_username", type=str, default="abdalgader",
                 help='Username for comet logging')
     parser.add_argument('--seed', type=int, default=123, metavar='S',
                         help='random seed (default: 1)')
@@ -590,7 +587,7 @@ if __name__ == '__main__':
 
     args.dev = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     if args.dataset=='PPI':
-        project_name = 'Normal-Transfer-Learning-PPI '
+        project_name = 'experiments-on-ppi'
     elif args.dataset=='REDDIT-MULTI-12K':
         project_name = "meta-graph-reddit"
     elif args.dataset=='FIRSTMM_DB':
