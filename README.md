@@ -1,6 +1,6 @@
 # A Comparative Study of Graph Representations for Few-Shot Link Prediction
 
-link to the [report](https://github.com/abdalgader-a/MetaLearning-for-graph-representation-with-application-to-drug-discovery/blob/master/report.pdf).
+link to the [report](https://github.com/abdalgader-a/MetaLearning-for-graph-representation-with-application-to-drug-discovery/blob/master/Note.pdf).
 
 # Enviroment
 
